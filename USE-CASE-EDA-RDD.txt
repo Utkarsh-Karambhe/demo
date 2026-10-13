@@ -1,0 +1,1131 @@
+//Covers both EDA + RDD + one optimization technique
+
+# PySpark Lab: Telecom Customer Analytics
+
+// 1. Problem Statement
+
+A telecom company stores customer information in a CSV file. The company wants to analyze customer data using PySpark.
+
+You need to:
+
+1. Load the CSV dataset into PySpark.
+2. Perform preprocessing:
+
+   * Handle null values.
+   * Convert data types.
+3. Perform EDA:
+
+   * Find total customers.
+   * Find average monthly bill.
+   * Find customers by city.
+   * Find customers with high monthly bills.
+4. Demonstrate RDD:
+
+   * Create an RDD.
+   * Apply transformations.
+   * Apply an action.
+5. Apply one Spark optimization technique:
+
+   * Use cache().
+   * Compare execution before and after caching.
+
+
+# 2. What We Are Building
+
+text
+telecom_customers.csv
+        |
+        v
+     PySpark
+        |
+        ++
+        |                  |
+        v                  v
+   DataFrame             RDD
+        |                  |
+        v                  v
+ Preprocessing       Transformations
+        |
+        v
+      EDA
+        |
+        v
+   Business Results
+        |
+        v
+    cache()
+        |
+        v
+ Performance comparison
+
+
+
+
+# 3. Dataset
+
+We will use a very small dataset so students can easily understand it.
+
+Create project:
+
+bash
+cd ~
+mkdir -p telecom-pyspark/data
+cd telecom-pyspark
+
+
+Create CSV:
+
+bash
+nano data/telecom_customers.csv
+
+
+Paste:
+
+text
+customer_id,name,age,city,monthly_bill,tenure,plan
+C001,Rahul,28,Bengaluru,599,12,Premium
+C002,Priya,35,Mumbai,799,24,Premium
+C003,Amit,42,Delhi,450,36,Basic
+C004,Neha,,Bengaluru,699,18,Premium
+C005,Arun,31,Chennai,,10,Basic
+C006,Kiran,27,Mumbai,999,30,Premium
+C007,Divya,45,Delhi,550,48,Basic
+C008,Ravi,29,Bengaluru,650,15,Premium
+C009,Anita,38,Chennai,500,,Basic
+C010,Suresh,52,Mumbai,1200,60,Premium
+
+
+Save:
+
+text
+Ctrl+O
+Enter
+Ctrl+X
+
+
+Check:
+
+bash
+cat data/telecom_customers.csv
+
+
+
+
+# 4. What Problems Are Intentionally Present?
+
+We deliberately put some problems in the dataset.
+
+//# Missing age
+
+text
+C004,Neha,,Bengaluru
+
+
+Age is NULL.
+
+//# Missing monthly bill
+
+text
+C005,Arun,31,Chennai,,10
+
+
+Monthly bill is NULL.
+
+//# Missing tenure
+
+text
+C009,Anita,38,Chennai,500,
+
+
+Tenure is NULL.
+
+This allows students to demonstrate preprocessing.
+
+
+
+# 5. Check Your Spark Installation
+
+Since you are using PySpark, check:
+
+bash
+pyspark --version
+
+
+Also:
+
+bash
+spark-submit --version
+
+
+//# Important for your machine
+
+Your Hadoop/HBase environment is using Java 8.
+
+If your installed Spark is Spark 4.x, it will not work with Java 8. Spark 4.x requires newer Java.
+
+For this lab, use a Java-8-compatible Spark version, preferably Spark 3.5.x configured appropriately for your environment.
+
+If `pyspark --version` already works, do not reinstall anything.
+
+
+
+# 6. Create the PySpark Program
+
+Create:
+
+bash
+nano telecom_eda_rdd.py
+
+
+Paste this complete program:
+
+python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg, count, col
+
+
+# 1. Initialize Spark
+
+
+spark = SparkSession.builder \
+    .appName("TelecomCustomerAnalytics") \
+    .master("local[*]") \
+    .getOrCreate()
+
+print("Spark Started Successfully")
+
+
+
+# 2. Load CSV Dataset
+
+
+df = spark.read.csv(
+    "data/telecom_customers.csv",
+    header=True,
+    inferSchema=True
+)
+
+print("\nOriginal Data:")
+df.show()
+
+
+
+# 3. Display Schema
+
+
+print("\nOriginal Schema:")
+df.printSchema()
+
+
+
+# 4. Handle NULL Values
+
+
+df_clean = df.fillna({
+    "age": 0,
+    "monthly_bill": 0.0,
+    "tenure": 0
+})
+
+print("\nData After Handling NULL Values:")
+df_clean.show()
+
+
+
+# 5. Type Conversion
+
+
+df_clean = df_clean \
+    .withColumn("age", col("age").cast("integer")) \
+    .withColumn("monthly_bill", col("monthly_bill").cast("double")) \
+    .withColumn("tenure", col("tenure").cast("integer"))
+
+print("\nSchema After Type Conversion:")
+df_clean.printSchema()
+
+
+
+# 6. EDA - Total Customers
+
+
+total_customers = df_clean.count()
+
+print("\nTotal Customers:")
+print(total_customers)
+
+
+
+# 7. EDA - Average Monthly Bill
+
+
+print("\nAverage Monthly Bill:")
+
+df_clean.select(
+    avg("monthly_bill").alias("average_monthly_bill")
+).show()
+
+
+
+# 8. EDA - Customers By City
+
+
+print("\nCustomers By City:")
+
+df_clean.groupBy("city") \
+    .agg(count("*").alias("customer_count")) \
+    .orderBy(col("customer_count").desc()) \
+    .show()
+
+
+
+# 9. EDA - High Bill Customers
+
+
+print("\nCustomers With Monthly Bill Greater Than 700:")
+
+df_clean.filter(
+    col("monthly_bill") > 700
+).show()
+
+
+
+# 10. EDA - Average Bill By Plan
+
+
+print("\nAverage Monthly Bill By Plan:")
+
+df_clean.groupBy("plan") \
+    .agg(avg("monthly_bill").alias("average_bill")) \
+    .show()
+
+
+
+# 11. RDD Creation
+
+
+print("\nRDD Demonstration:")
+
+rdd = spark.sparkContext.parallelize(
+    [100, 200, 300, 400, 500]
+)
+
+print("Original RDD:")
+print(rdd.collect())
+
+
+
+# 12. RDD Transformation
+
+
+rdd_doubled = rdd.map(
+    lambda x: x * 2
+)
+
+print("RDD After map Transformation:")
+print(rdd_doubled.collect())
+
+
+
+# 13. RDD Filter Transformation
+
+
+rdd_filtered = rdd.filter(
+    lambda x: x > 250
+)
+
+print("RDD After filter Transformation:")
+print(rdd_filtered.collect())
+
+
+
+# 14. RDD Action
+
+
+print("RDD Count:")
+print(rdd_filtered.count())
+
+
+
+# 15. Cache Optimization
+
+
+df_clean.cache()
+
+print("\nFirst Action After Cache:")
+start_count = df_clean.count()
+
+print("Customer Count:")
+print(start_count)
+
+
+print("\nSecond Action After Cache:")
+average_result = df_clean.select(
+    avg("monthly_bill")
+).collect()
+
+print(average_result)
+
+
+
+# 16. Stop Spark
+
+
+spark.stop()
+
+print("\nSpark Application Completed")
+
+
+Save:
+
+text
+Ctrl+O
+Enter
+Ctrl+X
+
+
+
+
+# 7. Run the Program
+
+From:
+
+bash
+cd ~/telecom-pyspark
+
+
+Run:
+
+bash
+spark-submit telecom_eda_rdd.py
+
+
+Or:
+
+bash
+pyspark telecom_eda_rdd.py
+
+
+I recommend:
+
+bash
+spark-submit telecom_eda_rdd.py
+
+
+
+
+# 8. Understand EDA
+
+EDA means:
+
+> Exploratory Data Analysis
+
+In very simple words:
+
+> EDA means looking at the data to understand its important patterns.
+
+For example:
+
+text
+How many customers?
+Which city has more customers?
+What is the average bill?
+Which customers have high bills?
+Which plan has higher average billing?
+
+
+We are not building a machine-learning model here.
+
+We are simply understanding the dataset.
+
+
+
+# 9. Preprocessing
+
+Our preprocessing has two important parts.
+
+// Null handling
+
+We used:
+
+python
+df.fillna({
+    "age": 0,
+    "monthly_bill": 0.0,
+    "tenure": 0
+})
+
+
+Meaning:
+
+text
+NULL age          → 0
+NULL monthly_bill → 0
+NULL tenure       → 0
+
+
+For a real project, we may use better business rules, such as replacing missing age with average age.
+
+For this beginner lab, `0` keeps the concept simple.
+
+
+
+# 10. Type Conversion
+
+We used:
+
+python
+.withColumn("age", col("age").cast("integer"))
+
+
+and:
+
+python
+.withColumn("monthly_bill", col("monthly_bill").cast("double"))
+
+
+and:
+
+python
+.withColumn("tenure", col("tenure").cast("integer"))
+
+
+Meaning:
+
+text
+age          → integer
+monthly_bill → double
+tenure       → integer
+
+
+
+
+# 11. EDA Operations Used
+
+// A. Count customers
+
+python
+df_clean.count()
+
+
+This gives the number of rows.
+
+Expected:
+
+text
+10
+
+
+
+
+// B. Average monthly bill
+
+python
+df_clean.select(
+    avg("monthly_bill")
+).show()
+
+
+This tells us the average billing amount.
+
+
+
+// C. Customers by city
+
+python
+df_clean.groupBy("city").count().show()
+
+
+This answers:
+
+> How many customers belong to each city?
+
+
+
+// D. High-value customers
+
+python
+df_clean.filter(
+    col("monthly_bill") > 700
+).show()
+
+
+This answers:
+
+> Which customers have a monthly bill greater than 700?
+
+
+
+// E. Average bill by plan
+
+python
+df_clean.groupBy("plan") \
+    .agg(avg("monthly_bill")) \
+    .show()
+
+
+This answers:
+
+> Which plan has a higher average monthly bill?
+
+
+
+# 12. Now RDD
+
+RDD means:
+
+> Resilient Distributed Dataset
+
+It is a distributed collection of data.
+
+Very simple:
+
+text
+RDD = distributed collection of data
+
+
+We created:
+
+python
+rdd = spark.sparkContext.parallelize(
+    [100, 200, 300, 400, 500]
+)
+
+
+So:
+
+text
+RDD
+ ↓
+100
+200
+300
+400
+500
+
+
+
+
+# 13. RDD Transformation
+
+We used:
+
+python
+rdd_doubled = rdd.map(
+    lambda x: x * 2
+)
+
+
+Input:
+
+text
+100
+200
+300
+400
+500
+
+
+Output:
+
+text
+200
+400
+600
+800
+1000
+
+
+`map()` is a transformation.
+
+
+
+# 14. RDD Filter
+
+We used:
+
+python
+rdd_filtered = rdd.filter(
+    lambda x: x > 250
+)
+
+
+Input:
+
+text
+100
+200
+300
+400
+500
+
+
+Output:
+
+text
+300
+400
+500
+
+
+`filter()` is also a transformation.
+
+
+
+# 15. RDD Action
+
+We used:
+
+python
+rdd_filtered.count()
+
+
+Output:
+
+text
+3
+
+
+`count()` is an action.
+
+//# Easy memory trick
+
+text
+map()       → Transformation
+filter()    → Transformation
+count()     → Action
+collect()   → Action
+
+
+
+
+# 16. Transformation vs Action
+
+This is important for your students.
+
+//# Transformation
+
+Transformation creates another RDD/DataFrame.
+
+Examples:
+
+text
+map()
+filter()
+flatMap()
+groupByKey()
+reduceByKey()
+
+
+Spark does not immediately execute the transformation.
+
+//# Action
+
+Action actually triggers execution.
+
+Examples:
+
+text
+count()
+collect()
+first()
+reduce()
+
+
+Simple flow:
+
+text
+RDD
+ |
+ | map()
+ v
+RDD
+ |
+ | filter()
+ v
+RDD
+ |
+ | count()
+ v
+RESULT
+
+
+
+
+# 17. Optimization: Caching
+
+The optimization technique we use is:
+
+> Caching
+
+We write:
+
+python
+df_clean.cache()
+
+
+Why?
+
+Suppose we use the same DataFrame multiple times:
+
+text
+df_clean
+   |
+   +- count()
+   |
+   +- average()
+   |
+   +- groupBy()
+
+
+Without caching, Spark may need to recompute the DataFrame.
+
+With:
+
+python
+df_clean.cache()
+
+
+Spark keeps the computed data in memory after it is first used.
+
+So subsequent operations can reuse it.
+
+Simple idea:
+
+text
+Without cache:
+
+Data → Process → Count
+Data → Process → Average
+Data → Process → GroupBy
+
+
+With cache:
+
+Data → Process → CACHE
+                     |
+              +++
+              |      |      |
+            Count  Average GroupBy
+
+
+
+
+# 18. Important Point About Your Current Program
+
+The program demonstrates:
+
+//# EDA
+
+text
+CSV
+ ↓
+DataFrame
+ ↓
+Preprocessing
+ ↓
+EDA
+
+
+//# RDD
+
+text
+Python list
+ ↓
+parallelize()
+ ↓
+RDD
+ ↓
+map()
+ ↓
+filter()
+ ↓
+count()
+
+
+//# Optimization
+
+text
+DataFrame
+ ↓
+cache()
+ ↓
+Multiple actions
+
+
+So one program covers all three lab requirements.
+
+
+
+# 19. RDD vs DataFrame
+
+Give students this simple table:
+
+| RDD                             | DataFrame                             
+
+| Low-level API                   | Higher-level API                      |
+| Works with objects              | Works with rows/columns               |
+| Less optimized                  | Highly optimized                      |
+| More coding                     | Less coding                           |
+| `map()` / `filter()`            | `select()` / `filter()` / `groupBy()` |
+| Useful for low-level processing | Best for structured data              |
+
+For our telecom dataset:
+
+text
+CSV
+ ↓
+DataFrame
+
+
+is the better choice because the data has columns:
+
+text
+customer_id
+name
+age
+city
+monthly_bill
+tenure
+plan
+
+
+
+
+# 20. RDD vs DataFrame vs Dataset
+
+For simple teaching:
+
+text
+RDD
+ ↓
+Low-level distributed data
+
+DataFrame
+ ↓
+Structured data in rows and columns
+
+Dataset
+ ↓
+Typed structured data
+
+
+In PySpark, DataFrames are the main structured-data API. The typed Dataset API is primarily associated with Scala/Java.
+
+
+
+# 21. Where Is Spark Used Here?
+
+Our complete application is:
+
+text
+Telecom CSV
+     |
+     v
+Spark
+     |
+     +- DataFrame
+     |       |
+     |       +- preprocessing
+     |       +- EDA
+     |
+     +- RDD
+     |       |
+     |       +- map
+     |       +- filter
+     |       +- count
+     |
+     +- Cache
+             |
+             +- optimization
+
+
+
+
+# 22. Expected Important Output
+
+You should see something similar to:
+
+text
+Spark Started Successfully
+
+Total Customers:
+10
+
+
+RDD output:
+
+text
+Original RDD:
+[100, 200, 300, 400, 500]
+
+RDD After map Transformation:
+[200, 400, 600, 800, 1000]
+
+RDD After filter Transformation:
+[300, 400, 500]
+
+RDD Count:
+3
+
+
+And the EDA sections will show:
+
+text
+Average Monthly Bill
+Customers By City
+Customers With Monthly Bill Greater Than 700
+Average Monthly Bill By Plan
+
+
+The exact formatting can vary depending on your Spark version.
+
+
+
+# 23. Very Important: Spark UI
+
+While the program is running, Spark normally provides a Web UI:
+
+text
+http://localhost:4040
+
+
+Open it in your Windows browser.
+
+You can see:
+
+text
+Jobs
+Stages
+Storage
+Environment
+Executors
+SQL
+
+
+For your optimization discussion, Storage is particularly useful after using:
+
+python
+df_clean.cache()
+
+
+
+
+# 24. Commands From Beginning — Student Version
+
+For your lab, students can follow:
+
+bash
+cd ~
+mkdir -p telecom-pyspark/data
+cd telecom-pyspark
+
+
+Create dataset:
+
+bash
+nano data/telecom_customers.csv
+
+
+Paste the 10 records.
+
+Then:
+
+bash
+nano telecom_eda_rdd.py
+
+
+Paste the PySpark program.
+
+Run:
+
+bash
+spark-submit telecom_eda_rdd.py
+
+
+View Spark UI:
+
+text
+http://localhost:4040
+
+
+
+
+# 25. What the Student Has Demonstrated
+
+At the end of the lab, the student has demonstrated:
+
+| Requirement          | Implementation                      |
+
+| Load dataset         | `spark.read.csv()`                  |
+| Preprocessing        | `fillna()`                          |
+| Type conversion      | `cast()`                            |
+| EDA                  | `count`, `avg`, `groupBy`, `filter` |
+| RDD creation         | `parallelize()`                     |
+| RDD transformation   | `map()`                             |
+| RDD transformation   | `filter()`                          |
+| RDD action           | `count()`                           |
+| Optimization         | `cache()`                           |
+| Spark initialization | `SparkSession`                      |
+| Execution            | `spark-submit`                      |
+
+
+
+# 26. One-Line Explanation for Each Concept
+
+Spark: Distributed processing engine.
+
+SparkSession: Entry point for DataFrame-based Spark programs.
+
+DataFrame: Structured data organized into rows and columns.
+
+RDD: Distributed collection of data.
+
+Transformation: Operation that creates new data from existing data.
+
+Action: Operation that produces a result and triggers execution.
+
+EDA: Exploring data to understand patterns and statistics.
+
+Preprocessing: Cleaning and preparing data before analysis.
+
+Cache: Keeps computed data available for reuse to reduce recomputation.
+
+Partition: A piece of distributed data processed by Spark.
+
+Shuffle: Movement of data between partitions, commonly during operations such as `groupBy` and joins.
+
+Broadcast variable: Sends a small read-only dataset efficiently to executors.
+
+
+
+// Final architecture students should remember
+
+text
+             TELECOM CSV
+                  |
+                  v
+          ++
+          |    PySpark    |
+          ++
+                  |
+        +++
+        |                   |
+        v                   v
+    DataFrame              RDD
+        |                   |
+        v                   v
+ Preprocessing          map/filter
+        |
+        v
+       EDA
+        |
+        v
+   Business Results
+        |
+        v
+      cache()
+        |
+        v
+  Faster Reuse of Data
+
+

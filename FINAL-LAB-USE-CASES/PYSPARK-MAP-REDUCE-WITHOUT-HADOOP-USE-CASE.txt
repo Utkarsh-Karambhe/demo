@@ -1,0 +1,117 @@
+
+//USE CASE -8 
+
+//Pyspark without Hadoop 
+
+python3 --version
+
+pip3 --version
+
+java -version
+
+python3 -m venv ~/spark-venv
+
+source ~/spark-venv/bin/activate
+
+pip install pyspark==3.5.7
+
+pyspark --version
+
+mkdir -p ~/spark-mapreduce-lab/input
+
+mkdir -p ~/spark-mapreduce-lab/output
+
+cd ~/spark-mapreduce-lab
+
+//nano input/employees.csv
+
+cat input/employees.csv
+emp_id,name,department,salary
+101,Rahul,IT,60000
+102,Priya,HR,45000
+103,Arun,IT,70000
+104,Neha,Finance,55000
+105,Kiran,HR,50000
+106,Anita,Finance,65000
+107,Ravi,IT,80000
+
+//nano employee_salary.py
+
+from pyspark import SparkConf, SparkContext
+
+conf = SparkConf() \
+    .setAppName("EmployeeSalaryAnalysis") \
+    .setMaster("local[*]") \
+    .set("spark.hadoop.fs.defaultFS", "file:///")
+
+sc = SparkContext(conf=conf)
+
+lines = sc.textFile(
+    "file:///home/ubuntu/spark-mapreduce-lab/input/employees.csv"
+)
+
+header = lines.first()
+
+data = lines.filter(lambda line: line != header)
+
+mapped = data.map(
+    lambda line: (
+        line.split(",")[2],
+        (int(line.split(",")[3]), 1)
+    )
+)
+
+reduced = mapped.reduceByKey(
+    lambda x, y: (
+        x[0] + y[0],
+        x[1] + y[1]
+    )
+)
+
+result = reduced.mapValues(
+    lambda x: (
+        x[1],
+        x[0],
+        x[0] / x[1]
+    )
+)
+
+sorted_result = result.sortByKey()
+
+for department, values in sorted_result.collect():
+    print(
+        department,
+        values[0],
+        values[1],
+        values[2]
+    )
+
+output = sorted_result.map(
+    lambda x: (
+        x[0],
+        x[1][0],
+        x[1][1],
+        x[1][2]
+    )
+)
+
+output.map(
+    lambda x: ",".join(map(str, x))
+).coalesce(1).saveAsTextFile(
+    "file:///home/ubuntu/spark-mapreduce-lab/output/department_salary"
+)
+
+sc.stop()
+
+
+//rm -rf output/department_salary
+//
+spark-submit employee_salary.py
+//
+cat output/department_salary/part-*
+//
+Finance,2,120000,60000.0
+HR,2,95000,47500.0
+IT,3,210000,70000.0
+
+

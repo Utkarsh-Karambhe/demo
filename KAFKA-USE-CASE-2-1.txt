@@ -1,0 +1,222 @@
+cd ~
+wget -c https://downloads.apache.org/kafka/4.2.2/kafka_2.13-4.2.2.tgz
+
+
+tar -xzf kafka_2.13-4.2.2.tgz
+
+cd ~/kafka_2.13-4.2.2
+
+bin/kafka-topics.sh --version
+
+
+
+
+///////////////////////////
+cd ~
+
+cd ~/kafka_2.13-3.7.2
+
+wget -c https://repo.huaweicloud.com/repository/apache/kafka/3.7.2/kafka_2.13-3.7.2.tgz
+
+tar -xzf kafka_2.13-3.7.2.tgz
+
+cd ~/kafka_2.13-3.7.2
+
+java -version
+
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
+KAFKA_CLUSTER_ID="$(bin/kafka-storage.sh random-uuid)"
+
+echo $KAFKA_CLUSTER_ID
+
+bin/kafka-storage.sh format \
+-t "d7ypXE0ERQuwQ6Y3PhUWSg" \
+-c config/kraft/server.properties
+
+
+//consider this terminal 1
+//start the Kafka server
+
+bin/kafka-server-start.sh \
+config/kraft/server.properties
+
+
+
+
+//Terminal 2
+
+bin/kafka-topics.sh \
+--create \
+--topic payments \
+--bootstrap-server localhost:9092 \
+--partitions 3 \
+--replication-factor 1
+
+//Verify topic
+bin/kafka-topics.sh \
+--describe \
+--topic payments \
+--bootstrap-server localhost:9092
+
+
+//Terminal 3
+cd ~/kafka_2.13-3.7.2
+
+bin/kafka-console-producer.sh \
+--topic payments \
+--bootstrap-server localhost:9092 \
+--property parse.key=true \
+--property key.separator="|"
+
+>
+acc101|{"txn_id":1,"amount":2500,"type":"DEBIT"}
+acc102|{"txn_id":2,"amount":99000,"type":"CREDIT"}
+acc101|{"txn_id":3,"amount":120,"type":"DEBIT"}
+acc103|{"txn_id":4,"amount":45000,"type":"DEBIT"}
+acc101|{"txn_id":5,"amount":800,"type":"DEBIT"}
+
+
+//Terminal 4
+
+bin/kafka-console-consumer.sh \
+--topic payments \
+--bootstrap-server localhost:9092 \
+--group fraud-service \
+--from-beginning \
+--property print.key=true \
+--property print.partition=true
+
+
+//once you added transactions in producer check it in consumer.
+
+//PART A COMPLETED
+
+//PART B STARTED (OPEN NEW TERMINAL)
+
+cd ~/kafka_2.13-3.7.2
+mkdir -p ~/connect-demo/source
+mkdir -p ~/connect-demo/sink
+
+nano ~/connect-demo/source/transactions.log
+
+{"txn_id":101,"account":"acc201","amount":1500,"city":"Bengaluru"}
+{"txn_id":102,"account":"acc202","amount":32000,"city":"Mumbai"}
+{"txn_id":103,"account":"acc203","amount":700,"city":"Delhi"}
+
+cat ~/connect-demo/source/transactions.log
+
+ls libs/connect-file*
+
+nano ~/kafka_2.13-3.7.2/config/connect-standalone.properties
+
+//Go to the bottom of the file and add:
+
+plugin.path=/home/ubuntu/kafka_2.13-3.7.2/libs
+
+//Save:
+
+Ctrl+O
+Enter
+Ctrl+X
+
+grep '^plugin.path' ~/kafka_2.13-3.7.2/config/connect-standalone.properties
+
+plugin.path=/home/ubuntu/kafka_2.13-3.7.2/libs
+
+//
+nano ~/connect-demo/file-source.properties
+
+name=txn-file-source
+connector.class=FileStreamSource
+tasks.max=1
+file=/home/ubuntu/connect-demo/source/transactions.log
+topic=bank-transactions
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+
+//
+nano ~/connect-demo/file-sink.properties
+
+name=txn-file-sink
+connector.class=FileStreamSink
+tasks.max=1
+file=/home/ubuntu/connect-demo/sink/transactions_archive.txt
+topics=bank-transactions
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+
+
+//OPEN TERMINAL 2
+cd ~/kafka_2.13-3.7.2
+
+bin/kafka-topics.sh \
+--create \
+--topic bank-transactions \
+--bootstrap-server localhost:9092 \
+--partitions 1 \
+--replication-factor 1
+
+
+bin/kafka-topics.sh \
+--describe \
+--topic bank-transactions \
+--bootstrap-server localhost:9092
+
+
+//OPEN TERMINAL 5
+cd ~/kafka_2.13-3.7.2
+
+bin/connect-standalone.sh \
+config/connect-standalone.properties \
+~/connect-demo/file-source.properties \
+~/connect-demo/file-sink.properties
+
+//OPEN TERMINAL 6
+
+cd ~/kafka_2.13-3.7.2
+
+curl -s localhost:8083/connectors
+
+curl -s localhost:8083/connectors/txn-file-source/status
+
+# 31. Verify the Kafka Topic
+
+Run:
+
+
+cd ~/kafka_2.13-3.7.0
+
+
+Then:
+
+
+bin/kafka-console-consumer.sh \
+--topic bank-transactions \
+--bootstrap-server localhost:9092 \
+--from-beginning \
+--max-messages 3
+
+
+Expected:
+
+
+{"txn_id":101,"account":"acc201","amount":1500,"city":"Bengaluru"}
+{"txn_id":102,"account":"acc202","amount":32000,"city":"Mumbai"}
+{"txn_id":103,"account":"acc203","amount":700,"city":"Delhi"}
+
+
+This proves that the source connector successfully put the data into Kafka.
+
+cat ~/connect-demo/sink/transactions_archive.txt
+
+//ADD NEW
+echo '{"txn_id":104,"account":"acc204","amount":88000,"city":"Chennai"}' >> ~/connect-demo/source/transactions.log
+
+echo '{"txn_id":105,"account":"acc205","amount":260,"city":"Hyderabad"}' >> ~/connect-demo/source/transactions.log
+
+cat ~/connect-demo/sink/transactions_archive.txt
+
+
+

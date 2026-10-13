@@ -1,0 +1,1042 @@
+
+Source Files
+    ↓
+HDFS
+    ↓
+Hive External Tables
+    ↓
+Hive Transformations
+    ↓
+Hive Data Warehouse Tables
+    ↓
+Final Reporting / Analytics
+```
+
+Insurance Claims because it gives us enough complexity to demonstrate joins, aggregations, partitions, incremental loading, data cleansing, and warehouse modeling.
+
+ # End-to-End Insurance ETL — HDFS \+ Hive
+
+// 1\. Project scenario
+
+ Imagine an insurance company receives three daily files:
+
+```
+customers.csv
+policies.csv
+claims.csv
+```
+
+ The files arrive on a Linux server.
+
+ Our job:
+
+ 1. Load raw files into HDFS.
+2. Create Hive external tables on the raw data.
+3. Perform data-quality checks.
+4. Transform data using Hive.
+5. Create warehouse/dimensional tables.
+6. Partition the warehouse tables.
+7. Perform incremental loads.
+8. Run business queries on the final warehouse.
+
+// Technology
+
+```
+Linux
+HDFS
+Hive
+SQL
+Shell scripting
+
+Optional:
+Sqoop
+Oozie
+Spark
+```
+
+ For your first version, don't add Spark/Sqoop/Oozie. Get HDFS + Hive working first.
+
+---
+
+ # 2\. Architecture
+
+```
+             SOURCE
+               |
+       ┌───────┼────────┐
+       ↓       ↓        ↓
+ customers  policies   claims
+    CSV        CSV       CSV
+       \        |        /
+        \       |       /
+         └──────┼──────┘
+                ↓
+               HDFS
+                |
+          RAW DATABASE
+                |
+         Hive External Tables
+                |
+          Data Validation
+                |
+          Hive Transformations
+                |
+        ┌───────┼───────────┐
+        ↓       ↓           ↓
+    Dimension  Dimension   Fact
+    Customer   Policy      Claims
+        \        |           /
+         \       |          /
+          └──────┼─────────┘
+                 ↓
+             DATA WAREHOUSE
+                 |
+                 ↓
+          Reporting Queries
+
+
+ # 3\. Directory structure
+
+ On Linux:
+
+```
+mkdir -p ~/insurance_etl
+cd ~/insurance_etl
+
+mkdir source
+mkdir scripts
+mkdir hive
+mkdir logs
+```
+
+ You'll have:
+
+```
+insurance_etl/
+│
+├── source/
+│   ├── customers.csv
+│   ├── policies.csv
+│   └── claims.csv
+│
+├── scripts/
+│   └── load_hdfs.sh
+│
+├── hive/
+│   ├── 01_database.sql
+│   ├── 02_raw_tables.sql
+│   ├── 03_staging.sql
+│   ├── 04_dimensions.sql
+│   ├── 05_fact.sql
+│   └── 06_queries.sql
+│
+└── logs/
+```
+
+---
+
+ # 4\. Source data
+
+// customers.csv
+
+```
+customer_id,name,city,state,dob
+101,Rahul,Bangalore,Karnataka,1998-04-10
+102,Priya,Chennai,Tamil Nadu,1995-07-22
+103,Amit,Mumbai,Maharashtra,1990-11-15
+104,Sneha,Delhi,Delhi,1997-02-18
+105,Arjun,Hyderabad,Telangana,1992-09-30
+```
+
+// policies.csv
+
+```
+policy_id,customer_id,policy_type,premium,start_date,end_date
+P1001,101,Health,25000,2025-01-01,2025-12-31
+P1002,102,Auto,18000,2025-02-01,2026-01-31
+P1003,103,Health,30000,2025-01-15,2025-12-31
+P1004,104,Life,45000,2025-03-01,2026-02-28
+P1005,105,Auto,20000,2025-01-10,2025-12-31
+```
+
+// claims.csv
+
+```
+claim_id,policy_id,claim_date,claim_amount,status
+C001,P1001,2025-03-10,50000,Approved
+C002,P1002,2025-04-15,30000,Rejected
+C003,P1003,2025-05-20,75000,Approved
+C004,P1004,2025-06-11,100000,Pending
+C005,P1005,2025-07-05,25000,Approved
+C006,P1001,2025-08-10,15000,Approved
+```
+
+---
+
+ # 5\. Put files into HDFS
+
+ First create HDFS directories:
+
+```
+hdfs dfs -mkdir -p /insurance/raw/customers
+hdfs dfs -mkdir -p /insurance/raw/policies
+hdfs dfs -mkdir -p /insurance/raw/claims
+```
+
+ Check:
+
+```
+hdfs dfs -ls /insurance/raw
+```
+
+ Upload:
+
+```
+hdfs dfs -put source/customers.csv \
+/insurance/raw/customers/
+
+hdfs dfs -put source/policies.csv \
+/insurance/raw/policies/
+
+hdfs dfs -put source/claims.csv \
+/insurance/raw/claims/
+```
+
+ Verify:
+
+```
+hdfs dfs -ls -R /insurance
+```
+
+ Read a file directly from HDFS:
+
+```
+hdfs dfs -cat /insurance/raw/customers/customers.csv
+```
+
+ This is your Extract + Load into HDFS stage.
+
+---
+
+ # 6\. Create Hive databases
+
+ Start Hive:
+
+```
+hive
+```
+
+ Or depending on your installation:
+
+```
+beeline
+```
+
+ Create databases:
+
+```
+CREATE DATABASE insurance_raw;
+CREATE DATABASE insurance_staging;
+CREATE DATABASE insurance_dw;
+```
+
+ Check:
+
+```
+SHOW DATABASES;
+```
+
+---
+
+ # 7\. Create RAW Hive tables
+
+ This is important:
+
+ Raw tables should generally be external tables.
+
+ Why?
+
+ Because Hive manages the metadata, but the underlying data remains in HDFS.
+
+ Create:
+
+```
+USE insurance_raw;
+
+CREATE EXTERNAL TABLE customers_raw (
+    customer_id INT,
+    name STRING,
+    city STRING,
+    state STRING,
+    dob STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/insurance/raw/customers';
+```
+
+ Policies:
+
+```
+CREATE EXTERNAL TABLE policies_raw (
+    policy_id STRING,
+    customer_id INT,
+    policy_type STRING,
+    premium DOUBLE,
+    start_date STRING,
+    end_date STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/insurance/raw/policies';
+```
+
+ Claims:
+
+```
+CREATE EXTERNAL TABLE claims_raw (
+    claim_id STRING,
+    policy_id STRING,
+    claim_date STRING,
+    claim_amount DOUBLE,
+    status STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/insurance/raw/claims';
+```
+
+---
+
+ # 8\. Verify RAW data
+
+```
+SELECT * FROM customers_raw;
+```
+
+```
+SELECT * FROM policies_raw;
+```
+
+```
+SELECT * FROM claims_raw;
+```
+
+ Count:
+
+```
+SELECT COUNT(*) FROM customers_raw;
+```
+
+ Expected:
+
+```
+5
+```
+
+ Claims:
+
+```
+SELECT COUNT(*) FROM claims_raw;
+```
+
+ Expected:
+
+```
+6
+```
+
+---
+
+ # 9\. Problem: CSV header
+
+ In real ETL, your CSV has:
+
+```
+customer_id,name,city,state,dob
+```
+
+ Hive will interpret that as a data record unless you configure the table appropriately.
+
+ Depending on your Hive version:
+
+```
+TBLPROPERTIES ("skip.header.line.count"="1");
+```
+
+ For example:
+
+```
+ALTER TABLE customers_raw
+SET TBLPROPERTIES ("skip.header.line.count"="1");
+```
+
+ Do the same for:
+
+```
+ALTER TABLE policies_raw
+SET TBLPROPERTIES ("skip.header.line.count"="1");
+
+ALTER TABLE claims_raw
+SET TBLPROPERTIES ("skip.header.line.count"="1");
+```
+
+---
+
+ # 10\. STAGING layer
+
+ Now we start transforming.
+
+ Create staging tables.
+
+```
+USE insurance_staging;
+
+CREATE TABLE customers_stg AS
+SELECT
+    customer_id,
+    TRIM(name) AS name,
+    TRIM(city) AS city,
+    TRIM(state) AS state,
+    CAST(dob AS DATE) AS dob
+FROM insurance_raw.customers_raw
+WHERE customer_id IS NOT NULL;
+```
+
+ Now:
+
+```
+SELECT * FROM customers_stg;
+```
+
+---
+
+ # 11\. Transform policies
+
+```
+CREATE TABLE policies_stg AS
+SELECT
+    TRIM(policy_id) AS policy_id,
+    customer_id,
+    TRIM(policy_type) AS policy_type,
+    CAST(premium AS DECIMAL(12,2)) AS premium,
+    CAST(start_date AS DATE) AS start_date,
+    CAST(end_date AS DATE) AS end_date
+FROM insurance_raw.policies_raw
+WHERE policy_id IS NOT NULL;
+```
+
+---
+
+ # 12\. Transform claims
+
+```
+CREATE TABLE claims_stg AS
+SELECT
+    TRIM(claim_id) AS claim_id,
+    TRIM(policy_id) AS policy_id,
+    CAST(claim_date AS DATE) AS claim_date,
+    CAST(claim_amount AS DECIMAL(12,2)) AS claim_amount,
+    UPPER(TRIM(status)) AS status
+FROM insurance_raw.claims_raw
+WHERE claim_id IS NOT NULL;
+```
+
+ Now your flow is:
+
+```
+HDFS
+ ↓
+RAW Hive
+ ↓
+STAGING Hive
+```
+
+---
+
+ # 13\. Data-quality checks
+
+ This is where you show interviewers you understand real ETL.
+
+// Duplicate claims
+
+```
+SELECT
+    claim_id,
+    COUNT(*)
+FROM claims_stg
+GROUP BY claim_id
+HAVING COUNT(*) > 1;
+```
+
+// Negative claims
+
+```
+SELECT *
+FROM claims_stg
+WHERE claim_amount < 0;
+```
+
+// Invalid status
+
+```
+SELECT *
+FROM claims_stg
+WHERE status NOT IN (
+    'APPROVED',
+    'REJECTED',
+    'PENDING'
+);
+```
+
+// Orphan policies
+
+ Find policies without customers:
+
+```
+SELECT p.*
+FROM policies_stg p
+LEFT JOIN customers_stg c
+ON p.customer_id = c.customer_id
+WHERE c.customer_id IS NULL;
+```
+
+// Orphan claims
+
+```
+SELECT c.*
+FROM claims_stg c
+LEFT JOIN policies_stg p
+ON c.policy_id = p.policy_id
+WHERE p.policy_id IS NULL;
+```
+
+ These are excellent interview examples.
+
+---
+
+ # 14\. Create the Data Warehouse
+
+ Now comes the important part.
+
+ We create a star schema.
+
+```
+                 dim_customer
+                      |
+                      |
+dim_policy ---- fact_claim ---- dim_date
+```
+
+ Fact:
+
+```
+fact_claim
+```
+
+ Dimensions:
+
+```
+dim_customer
+dim_policy
+dim_date
+```
+
+---
+
+ # 15\. Customer dimension
+
+```
+USE insurance_dw;
+
+CREATE TABLE dim_customer (
+    customer_key BIGINT,
+    customer_id INT,
+    customer_name STRING,
+    city STRING,
+    state STRING,
+    dob DATE
+)
+STORED AS PARQUET;
+```
+
+ Load:
+
+```
+INSERT INTO dim_customer
+
+SELECT
+    ROW_NUMBER() OVER (
+        ORDER BY customer_id
+    ) AS customer_key,
+
+    customer_id,
+    name,
+    city,
+    state,
+    dob
+
+FROM insurance_staging.customers_stg;
+```
+
+ Check:
+
+```
+SELECT * FROM dim_customer;
+```
+
+---
+
+ # 16\. Policy dimension
+
+```
+CREATE TABLE dim_policy (
+    policy_key BIGINT,
+    policy_id STRING,
+    customer_id INT,
+    policy_type STRING,
+    premium DECIMAL(12,2),
+    start_date DATE,
+    end_date DATE
+)
+STORED AS PARQUET;
+```
+
+ Load:
+
+```
+INSERT INTO dim_policy
+
+SELECT
+    ROW_NUMBER() OVER (
+        ORDER BY policy_id
+    ) AS policy_key,
+
+    policy_id,
+    customer_id,
+    policy_type,
+    premium,
+    start_date,
+    end_date
+
+FROM insurance_staging.policies_stg;
+```
+
+---
+
+ # 17\. Date dimension
+
+ This is another common interview topic.
+
+```
+CREATE TABLE dim_date (
+    date_key INT,
+    full_date DATE,
+    year INT,
+    month INT,
+    day INT
+)
+STORED AS PARQUET;
+```
+
+ You can populate it using Hive date-generation logic, or initially load a prepared calendar file.
+
+ For the project, having a date dimension lets you answer:
+
+ > "How many claims occurred per month?"
+
+ without repeatedly deriving date attributes.
+
+---
+
+ # 18\. Create the FACT table
+
+ This is the most important table.
+
+```
+CREATE TABLE fact_claim (
+    claim_key BIGINT,
+    claim_id STRING,
+    customer_key BIGINT,
+    policy_key BIGINT,
+    date_key INT,
+    claim_amount DECIMAL(12,2),
+    status STRING,
+    claim_to_premium_ratio DECIMAL(15,4)
+)
+PARTITIONED BY (
+    claim_year INT
+)
+STORED AS PARQUET;
+```
+
+ Now we have:
+
+```
+                  DIM_CUSTOMER
+                       |
+                       |
+DIM_DATE ------ FACT_CLAIM ------ DIM_POLICY
+```
+
+---
+
+ # 19\. Load the fact table
+
+ Join staging data with dimensions:
+
+```
+INSERT INTO fact_claim
+PARTITION (claim_year)
+
+SELECT
+    ROW_NUMBER() OVER (
+        ORDER BY c.claim_id
+    ) AS claim_key,
+
+    c.claim_id,
+
+    dc.customer_key,
+
+    dp.policy_key,
+
+    CAST(
+        DATE_FORMAT(c.claim_date, 'yyyyMMdd')
+        AS INT
+    ) AS date_key,
+
+    c.claim_amount,
+
+    c.status,
+
+    CAST(
+        c.claim_amount / dp.premium
+        AS DECIMAL(15,4)
+    ) AS claim_to_premium_ratio,
+
+    YEAR(c.claim_date) AS claim_year
+
+FROM insurance_staging.claims_stg c
+
+JOIN insurance_dw.dim_policy dp
+    ON c.policy_id = dp.policy_id
+
+JOIN insurance_dw.dim_customer dc
+    ON dp.customer_id = dc.customer_id;
+```
+
+ Now your data has reached the warehouse layer.
+
+---
+
+ # 20\. Check the warehouse
+
+```
+SELECT COUNT(*)
+FROM insurance_dw.fact_claim;
+```
+
+```
+SELECT *
+FROM insurance_dw.fact_claim;
+```
+
+ Partition check:
+
+```
+SHOW PARTITIONS insurance_dw.fact_claim;
+```
+
+ You should see something like:
+
+```
+claim_year=2025
+```
+
+---
+
+ # 21\. Business query
+
+ Now suppose management asks:
+
+ > "Give me total approved claims by insurance type."
+
+ Run:
+
+```
+SELECT
+    p.policy_type,
+    SUM(f.claim_amount) AS total_claim_amount
+FROM insurance_dw.fact_claim f
+JOIN insurance_dw.dim_policy p
+    ON f.policy_key = p.policy_key
+WHERE f.status = 'APPROVED'
+GROUP BY p.policy_type;
+```
+
+---
+
+ # 22\. Claims by state
+
+```
+SELECT
+    c.state,
+    COUNT(*) AS claim_count,
+    SUM(f.claim_amount) AS total_claim_amount
+FROM insurance_dw.fact_claim f
+JOIN insurance_dw.dim_customer c
+    ON f.customer_key = c.customer_key
+GROUP BY c.state
+ORDER BY total_claim_amount DESC;
+```
+
+---
+
+ # 23\. Monthly claims
+
+```
+SELECT
+    d.year,
+    d.month,
+    COUNT(*) AS claim_count,
+    SUM(f.claim_amount) AS total_claim_amount
+FROM insurance_dw.fact_claim f
+JOIN insurance_dw.dim_date d
+    ON f.date_key = d.date_key
+GROUP BY
+    d.year,
+    d.month
+ORDER BY
+    d.year,
+    d.month;
+```
+
+---
+
+ # 24\. Claim-to-premium analysis
+
+```
+SELECT
+    p.policy_type,
+    SUM(f.claim_amount) AS claims,
+    SUM(p.premium) AS premium,
+    SUM(f.claim_amount) / SUM(p.premium)
+        AS claim_premium_ratio
+FROM insurance_dw.fact_claim f
+JOIN insurance_dw.dim_policy p
+    ON f.policy_key = p.policy_key
+GROUP BY p.policy_type;
+```
+
+ Now you've created a genuine business metric rather than simply moving data from one table to another.
+
+---
+
+ # 25\. Incremental ETL
+
+ This is where your project becomes much stronger.
+
+ Suppose today's source contains:
+
+```
+C007
+C008
+C009
+```
+
+ Instead of reprocessing all historical claims, create an HDFS directory based on load date:
+
+```
+/insurance/raw/claims/
+    load_date=2025-09-01/
+    load_date=2025-09-02/
+    load_date=2025-09-03/
+```
+
+ Upload:
+
+```
+hdfs dfs -mkdir -p \
+/insurance/raw/claims/load_date=2025-09-02
+```
+
+```
+hdfs dfs -put claims_20250902.csv \
+/insurance/raw/claims/load_date=2025-09-02/
+```
+
+ Then Hive can process the new partition.
+
+ The conceptual flow is:
+
+```
+Day 1
+Source
+ ↓
+HDFS partition 2025-09-01
+ ↓
+Hive
+ ↓
+Warehouse
+
+Day 2
+Source
+ ↓
+HDFS partition 2025-09-02
+ ↓
+Hive
+ ↓
+ONLY NEW DATA
+ ↓
+Warehouse
+```
+
+ This is a very common interview discussion.
+
+---
+
+ # 26\. Why Parquet?
+
+ The raw layer can remain:
+
+```
+CSV / TEXT
+```
+
+ but the warehouse should use:
+
+```
+PARQUET
+```
+
+ Because Parquet is columnar and is generally much more suitable for analytical workloads.
+
+ Your architecture becomes:
+
+```
+RAW
+CSV
+ ↓
+HDFS
+ ↓
+Hive External Table
+ ↓
+STAGING
+ ↓
+Transformation
+ ↓
+WAREHOUSE
+PARQUET
+```
+
+---
+
+ # 27\. Complete ETL flow
+
+ This is the flow I want you to remember for interviews:
+
+```
+                    SOURCE
+                      |
+             CSV / Flat Files
+                      |
+                      ↓
+                    HDFS
+                      |
+                      ↓
+             ┌─────────────────┐
+             │   RAW LAYER     │
+             │ Hive External   │
+             │    Tables       │
+             └────────┬────────┘
+                      ↓
+             Data Quality Checks
+                      |
+                      ↓
+             ┌─────────────────┐
+             │ STAGING LAYER   │
+             │ Clean + Cast    │
+             │ Deduplicate     │
+             └────────┬────────┘
+                      ↓
+             Hive Transformations
+                      |
+              ┌───────┼────────┐
+              ↓       ↓        ↓
+           Customer  Policy    Date
+              |       |        |
+              └───────┼────────┘
+                      ↓
+                  FACT CLAIM
+                      |
+                      ↓
+             DATA WAREHOUSE
+                  Parquet
+                      |
+                      ↓
+              SQL / Reporting
+```
+
+---
+
+ # 28\. What to say when interviewer asks "Explain your project"
+
+ You can say:
+
+ > "I worked on an insurance claims ETL pipeline where the source data was available as CSV files. We first loaded the raw files into HDFS. In Hive, I created external tables over the raw data so that the raw files remained managed independently from Hive metadata.
+>
+>  We then created a staging layer where we performed cleansing, datatype conversions, duplicate checks, null handling and referential-integrity checks.
+>
+>  After that, we transformed the data using Hive SQL and loaded it into a dimensional data warehouse. We created customer and policy dimensions and a claims fact table. The warehouse tables were stored in Parquet and the fact table was partitioned by year to improve query performance.
+>
+>  Finally, we used Hive SQL to generate analytical metrics such as claim amount by policy type, claims by state and monthly claim trends. For incremental processing, we organized incoming data by load date and processed only the new data."
+
+ That's a proper Hadoop/Hive ETL answer, not a toy "I read CSV using Python and inserted into PostgreSQL" project.
+
+// The interview topics this one project covers
+
+```
+HDFS
+ ├── mkdir
+ ├── put
+ ├── get
+ ├── ls
+ ├── cat
+ └── rm
+
+Hive
+ ├── Database
+ ├── External table
+ ├── Internal table
+ ├── Partitions
+ ├── Joins
+ ├── Group By
+ ├── Window functions
+ ├── CASE
+ ├── CAST
+ ├── Date functions
+ └── INSERT OVERWRITE
+
+ETL
+ ├── Extraction
+ ├── Transformation
+ ├── Loading
+ ├── Data quality
+ ├── Deduplication
+ ├── Incremental load
+ ├── Error handling
+ └── Audit
+
+Data Warehouse
+ ├── Fact table
+ ├── Dimension table
+ ├── Star schema
+ ├── Surrogate key
+ ├── Partitioning
+ └── Parquet
+```
+
+ One important point: don't try to memorize these commands. Build the project locally and deliberately introduce a duplicate claim, a null value, an invalid policy ID, and a second day's file. Then run the pipeline and fix each case. That's what will make you comfortable in the interview.

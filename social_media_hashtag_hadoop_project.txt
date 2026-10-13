@@ -1,0 +1,363 @@
+SOCIAL MEDIA HASHTAG COUNT — HADOOP STREAMING
+================================================
+
+Project: Hashtag Frequency Counter
+Environment: Ubuntu / WSL
+Technologies: Python + Hadoop MapReduce + HDFS + YARN + Hadoop Streaming
+
+------------------------------------------------
+1. PROJECT OBJECTIVE
+------------------------------------------------
+
+Read social-media posts from HDFS, extract hashtags using a Python Mapper,
+count hashtag frequencies using MapReduce, and store the final result in HDFS.
+
+Expected output:
+
+#bigdata    3
+#hadoop     2
+#python     3
+#spark      2
+
+
+------------------------------------------------
+2. REQUIRED COMPONENTS
+------------------------------------------------
+
+Python       -> Mapper, Combiner, Reducer
+Java         -> Required by Hadoop
+Hadoop       -> MapReduce framework
+HDFS         -> Input and output storage
+YARN         -> Resource management / job execution
+Streaming    -> Allows Python programs to run with Hadoop MapReduce
+
+NOT REQUIRED FOR THIS PROJECT:
+PySpark
+HBase
+
+
+------------------------------------------------
+3. START HADOOP SERVICES
+------------------------------------------------
+
+Start HDFS:
+
+start-dfs.sh
+
+Start YARN:
+
+start-yarn.sh
+
+Check services:
+
+jps
+
+Expected important processes:
+
+NameNode
+DataNode
+SecondaryNameNode
+ResourceManager
+NodeManager
+
+
+------------------------------------------------
+4. CREATE PROJECT
+------------------------------------------------
+
+mkdir -p ~/social-media-hashtag
+cd ~/social-media-hashtag
+
+
+------------------------------------------------
+5. CREATE INPUT FILE
+------------------------------------------------
+
+nano social_posts.txt
+
+Put:
+
+P1001 rahul #python #hadoop #bigdata
+P1002 priya #python #spark
+P1003 amit #hadoop #spark #bigdata
+P1004 neha #python #bigdata
+
+Check:
+
+cat social_posts.txt
+
+
+------------------------------------------------
+6. UPLOAD INPUT TO HDFS
+------------------------------------------------
+
+Create HDFS input directory:
+
+hdfs dfs -mkdir -p /social_media/input
+
+Upload:
+
+hdfs dfs -put social_posts.txt /social_media/input/
+
+Verify:
+
+hdfs dfs -ls /social_media/input
+
+Read HDFS input:
+
+hdfs dfs -cat /social_media/input/social_posts.txt
+
+
+------------------------------------------------
+7. CREATE PYTHON MAPPER
+------------------------------------------------
+
+nano mapper.py
+
+Code:
+
+#!/usr/bin/env python3
+
+import sys
+import re
+
+for line in sys.stdin:
+    line = line.strip()
+
+    hashtags = re.findall(r'#\w+', line)
+
+    for hashtag in hashtags:
+        print(f"{hashtag}\t1")
+
+Test:
+
+cat social_posts.txt | python3 mapper.py
+
+
+------------------------------------------------
+8. CREATE PYTHON COMBINER
+------------------------------------------------
+
+nano combiner.py
+
+Code:
+
+#!/usr/bin/env python3
+
+import sys
+
+current_hashtag = None
+current_count = 0
+
+for line in sys.stdin:
+    line = line.strip()
+
+    if not line:
+        continue
+
+    hashtag, count = line.split("\t")
+    count = int(count)
+
+    if current_hashtag == hashtag:
+        current_count += count
+    else:
+        if current_hashtag is not None:
+            print(f"{current_hashtag}\t{current_count}")
+
+        current_hashtag = hashtag
+        current_count = count
+
+if current_hashtag is not None:
+    print(f"{current_hashtag}\t{current_count}")
+
+
+Test:
+
+cat social_posts.txt | python3 mapper.py | sort | python3 combiner.py
+
+
+------------------------------------------------
+9. CREATE PYTHON REDUCER
+------------------------------------------------
+
+nano reducer.py
+
+Code:
+
+#!/usr/bin/env python3
+
+import sys
+
+current_hashtag = None
+current_count = 0
+
+for line in sys.stdin:
+    line = line.strip()
+
+    if not line:
+        continue
+
+    hashtag, count = line.split("\t")
+    count = int(count)
+
+    if current_hashtag == hashtag:
+        current_count += count
+    else:
+        if current_hashtag is not None:
+            print(f"{current_hashtag}\t{current_count}")
+
+        current_hashtag = hashtag
+        current_count = count
+
+if current_hashtag is not None:
+    print(f"{current_hashtag}\t{current_count}")
+
+
+Test:
+
+cat social_posts.txt | python3 mapper.py | sort | python3 reducer.py
+
+
+------------------------------------------------
+10. GIVE EXECUTE PERMISSION
+------------------------------------------------
+
+chmod +x mapper.py combiner.py reducer.py
+
+Check:
+
+ls -l
+
+
+------------------------------------------------
+11. FIND HADOOP STREAMING JAR
+------------------------------------------------
+
+find $HADOOP_HOME -name "hadoop-streaming*.jar"
+
+For this setup, the Streaming JAR was:
+
+/home/shikhasara/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar
+
+
+------------------------------------------------
+12. IMPORTANT — CORRECTED HADOOP STREAMING COMMAND
+------------------------------------------------
+
+Use the following command.
+
+First remove an old output directory if it exists:
+
+hdfs dfs -rm -r /social_media/output
+
+Then run:
+
+hadoop jar /home/shikhasara/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar \
+-input /social_media/input \
+-output /social_media/output \
+-mapper mapper.py \
+-combiner combiner.py \
+-reducer reducer.py \
+-files mapper.py,combiner.py,reducer.py
+
+
+IMPORTANT:
+Use -files ONCE with all three Python files separated by commas.
+
+This is the cleaned-up version of the Streaming command.
+
+
+------------------------------------------------
+13. WHY -FILES IS USED
+------------------------------------------------
+
+-files tells Hadoop to make the local Python programs available to the
+MapReduce tasks running in the Hadoop environment.
+
+The three files are:
+
+mapper.py
+combiner.py
+reducer.py
+
+
+------------------------------------------------
+14. CHECK HDFS OUTPUT
+------------------------------------------------
+
+List output:
+
+hdfs dfs -ls /social_media/output
+
+Read final result:
+
+hdfs dfs -cat /social_media/output/*
+
+Expected:
+
+#bigdata    3
+#hadoop     2
+#python     3
+#spark      2
+
+
+------------------------------------------------
+15. COMPLETE DATA FLOW
+------------------------------------------------
+
+social_posts.txt
+       |
+       v
+     HDFS
+       |
+       v
+ Python Mapper
+       |
+       v
+ (hashtag, 1)
+       |
+       v
+   Combiner
+       |
+       v
+Local aggregation
+       |
+       v
+ Hadoop Default Partitioner
+       |
+       v
+ Shuffle + Sort
+       |
+       v
+ Python Reducer
+       |
+       v
+     HDFS
+       |
+       v
+Final hashtag counts
+
+
+------------------------------------------------
+16. INTERVIEW EXPLANATION
+------------------------------------------------
+
+"I implemented a hashtag frequency counter using Hadoop Streaming.
+The social-media posts were stored in HDFS. A Python Mapper extracted
+hashtags and generated (hashtag, 1) key-value pairs. A Combiner performed
+local aggregation to reduce intermediate network traffic. Hadoop's
+default Partitioner distributed keys among reducers, and Shuffle and Sort
+grouped identical hashtags. Finally, a Python Reducer calculated the
+total frequency and stored the final result in HDFS."
+
+
+------------------------------------------------
+17. FINAL VERIFIED RESULT
+------------------------------------------------
+
+#bigdata    3
+#hadoop     2
+#python     3
+#spark      2
+
+Project status: COMPLETED SUCCESSFULLY

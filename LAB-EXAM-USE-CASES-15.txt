@@ -1,0 +1,731 @@
+
+# USE CASE 1: Web Server HTTP Status Code Analysis
+// 1. Problem Statement
+
+A company maintains millions of web-server access logs in HDFS. The data engineering team wants to analyze the logs and determine how many requests were received for each HTTP status code.
+
+//For example:
+200 → Successful request
+404 → Page not found
+500 → Server error
+
+The MapReduce program should:
+
+1. Read web-server logs from HDFS.
+2. Extract the HTTP status code.
+3. Generate (status_code, 1) from the Mapper.
+4. Use a Combiner for local aggregation.
+5. Use a custom Partitioner to distribute status codes among Reducers.
+6. Shuffle and group(sort) identical status codes.
+7. Use the Reducer to calculate the final count.
+8. Store the result in HDFS.
+
+
+2. Sample Input
+
+
+web_logs.txt
+
+//
+192.168.1.10 GET /home 200
+192.168.1.11 GET /login 200
+192.168.1.12 GET /product 404
+192.168.1.13 GET /home 200
+192.168.1.14 GET /checkout 500
+192.168.1.15 GET /product 404
+192.168.1.16 GET /home 200
+192.168.1.17 GET /server 500
+
+
+
+3. Expected Output
+200    4
+404    2
+500    2
+
+//Meaning:
+
+HTTP 200 → 4 requests
+HTTP 404 → 2 requests
+HTTP 500 → 2 requests
+
+4. Technology Stack
+
+| Component            | Technology       |
+
+| Operating System     | Ubuntu / WSL     |
+| Programming Language | Java             |
+| Processing           | Hadoop MapReduce |
+| Storage              | HDFS             |
+| Mapper               | Java             |
+| Combiner             | Java             |
+| Partitioner          | Custom Java      |
+| Reducer              | Java             |
+| Execution            | Hadoop YARN      |
+| Input                | Text file        |
+| Output               | HDFS             |
+
+
+5. Complete Architecture
+
+                 Web Server Logs
+                       |
+                       v
+                      HDFS
+                       |
+                       v
+                +--------------+
+                | Java Mapper  |
+                +--------------+
+                       |
+             (200,1), (200,1)
+             (404,1), (500,1)
+                       |
+                       v
+                +--------------+
+                |   Combiner   |
+                +--------------+
+                       |
+                 (200,2)
+                 (404,1)
+                 (500,1)
+                       |
+                       v
+                +--------------+
+                |  Partitioner |
+                +--------------+
+                   /          \
+                  /            \
+                 v              v
+          Reducer 0          Reducer 1
+               |                 |
+               +-------+---------+
+                       |
+                  Shuffle/Sort
+                       |
+                       v
+                  Reducer
+                       |
+                       v
+                      HDFS
+                       |
+                       v
+                 Final Output
+
+
+6. Map Stage
+
+The Mapper reads:
+192.168.1.10 GET /home 200
+
+and generates:
+
+200    1
+
+Another record:
+
+192.168.1.12 GET /product 404
+generates:
+
+404    1
+
+So Mapper output could be:
+200    1
+200    1
+404    1
+200    1
+500    1
+404    1
+200    1
+500    1
+
+7. Combiner Stage
+
+The Combiner performs local aggregation.
+
+For example, if one Mapper produces:
+
+200    1
+200    1
+200    1
+404    1
+
+the Combiner can produce:
+
+200    3
+404    1
+
+This reduces the amount of intermediate data transferred over the network.
+
+
+// Interview point
+
+> Combiner is a local mini-reducer. It reduces intermediate data before it is transferred to Reducers.
+
+//Important:
+
+Combiner is optional. Hadoop does not guarantee that it will execute.
+
+8. Partitioner Stage
+
+The Partitioner decides which Reducer receives each key.
+
+//For example:
+
+200 → Reducer 0
+404 → Reducer 1
+500 → Reducer 1
+
+
+The important rule is:
+
+> All values belonging to the same key must go to the same Reducer.
+
+For example, all 200 records must reach the same Reducer.
+
+
+9. Shuffle and Sort
+
+Hadoop groups the values belonging to the same key.
+
+//Conceptually:
+200 → [1,1,1,1]
+404 → [1,1]
+500 → [1,1]
+
+After Combiner, the amount of data transferred may already be reduced.
+
+
+10. Reduce Stage
+
+Reducer receives:
+200 → [1,1,1,1]
+404 → [1,1]
+500 → [1,1]
+
+and calculates:
+200 → 4
+404 → 2
+500 → 2
+
+//Final HDFS output:
+200    4
+404    2
+500    2
+
+-----------------------------------------------------------------------
+//USE CASE 2: Social Media Hashtag Analysis
+
+ 1. Problem Statement
+
+A social-media platform stores user posts in HDFS. Each post contains information such as post ID, username, caption and hashtags.
+The data engineering team wants to determine how many posts contain each hashtag.
+The MapReduce application should:
+
+1. Read social-media post data from HDFS.
+2. Extract hashtags.
+3. Generate (hashtag, 1) using a Python Mapper.
+4. Use a Combiner for local aggregation.
+5. Use Hadoop's Partitioner to distribute hashtags among Reducers.
+6. Shuffle and group identical hashtags.
+7. Calculate the final hashtag frequency.
+8. Store the result in HDFS.
+
+
+# 2. Sample Input
+social_posts.txt
+
+//
+P1001 rahul #python #hadoop #bigdata
+P1002 priya #python #spark
+P1003 amit #hadoop #spark #bigdata
+P1004 neha #python #bigdata
+
+
+3. Expected Output
+#bigdata    3
+#hadoop     2
+#python     3
+#spark      2
+
+# 4. Technology Stack
+
+| Component            | Technology                  |
+
+| Operating System     | Ubuntu / WSL                |
+| Programming Language | Python                      |
+| Processing           | Hadoop MapReduce            |
+| Storage              | HDFS                        |
+| Mapper               | Python                      |
+| Combiner             | Python                      |
+| Partitioner          | Hadoop Default Partitioner  |
+| Reducer              | Python                      |
+| Execution            | Hadoop Streaming            |
+| Input                | Text / semi-structured data |
+| Output               | HDFS                        |
+
+
+//Why Python here?
+
+Hadoop MapReduce is traditionally associated with Java, but Hadoop Streaming allows programs written in languages such as Python to participate in MapReduce.
+
+//So this project demonstrates:
+
+Java MapReduce
+        +
+Python Hadoop Streaming
+
+This is useful for a fresher interview.
+
+
+//5. Complete Architecture
+
+             Social Media Posts
+                     |
+                     v
+                    HDFS
+                     |
+                     v
+              Python Mapper
+                     |
+                     |
+       +-------------+-------------+
+       |             |             |
+   #python,1     #hadoop,1    #bigdata,1
+       |             |             |
+       +-------------+-------------+
+                     |
+                     v
+                Combiner
+                     |
+             Local aggregation
+                     |
+                     v
+               Partitioner
+                     |
+            +--------+--------+
+            |                 |
+            v                 v
+       Reducer 0          Reducer 1
+            |                 |
+            +--------+--------+
+                     |
+                Shuffle/Sort
+                     |
+                     v
+                  Reducer
+                     |
+                     v
+                    HDFS
+                     |
+                     v
+               Final Output
+
+6. Map Stage
+
+Input:
+
+P1001 rahul #python #hadoop #bigdata
+
+//Python Mapper produces:
+#python    1
+#hadoop    1
+#bigdata   1
+
+//For:
+P1002 priya #python #spark
+
+
+//Mapper produces:
+#python    1
+#spark     1
+
+
+//Overall Mapper output:
+#python    1
+#hadoop    1
+#bigdata   1
+#python    1
+#spark     1
+#hadoop    1
+#spark     1
+#bigdata   1
+#python    1
+#bigdata   1
+
+
+7. Combiner Stage
+
+Suppose one Mapper receives several records.
+
+Instead of sending:
+#python    1
+#python    1
+#python    1
+#bigdata   1
+#bigdata   1
+
+
+the Combiner can produce:
+#python    3
+#bigdata   2
+
+This reduces intermediate network traffic.
+
+
+8. Partitioner Stage
+
+Hadoop's default Partitioner determines which Reducer receives each hashtag.
+
+//Conceptually:
+
+#python  → Reducer 0
+#hadoop  → Reducer 1
+#bigdata → Reducer 0
+#spark   → Reducer 1
+
+//Again:
+
+Same key → Same Reducer
+
+This is essential for obtaining the correct final count.
+
+
+9. Shuffle and Sort
+
+//Hadoop groups the same hashtags:
+#python  → [1,1,1]
+#hadoop  → [1,1]
+#bigdata → [1,1,1]
+#spark   → [1,1]
+
+
+# 10. Reduce Stage
+
+//Reducer performs the aggregation:
+#python  → 3
+#hadoop  → 2
+#bigdata → 3
+#spark   → 2
+
+
+//Final output:
+#bigdata    3
+#hadoop     2
+#python     3
+#spark      2
+
+
+# Comparison of Both Lab Usecases:
+
+| Feature     | Use Case 1        | Use Case 2             |
+
+| Application | Web Log Analysis  | Social Media Analytics |
+| Language    | Java          	  | Python                 |
+| Mapper      | Java              | Python                 |
+| Combiner    | Java              | Python                 |
+| Partitioner | Custom Java   	  | Hadoop Default         |
+| Reducer     | Java              | Python                 |
+| Input       | Web logs          | Social posts           |
+| Storage     | HDFS              | HDFS                   |
+| Processing  | Hadoop MapReduce  | Hadoop Streaming       |
+| Main output | HTTP status count | Hashtag count          |
+
+
+# What You Should Demonstrate in the Lab
+
+//For Use Case 1, demonstrate:
+1. Create input file
+2. Upload to HDFS
+3. Write Java Mapper
+4. Write Java Combiner
+5. Write Custom Partitioner
+6. Write Java Reducer
+7. Compile Java files
+8. Create JAR
+9. Run MapReduce job
+10. Check HDFS output
+
+//For Use Case 2:
+
+1. Create social-media input
+2. Upload to HDFS
+3. Write Python Mapper
+4. Write Python Combiner
+5. Write Python Reducer
+6. Give executable permission
+7. Run using Hadoop Streaming
+8. Check HDFS output
+
+
+# Important Interview Questions
+Q1. Why do we use Combiner?
+
+Answer:
+
+> Combiner performs local aggregation at the Mapper side and reduces the amount of intermediate data transferred across the network during Shuffle.
+
+ Q2. Is Combiner mandatory?
+
+Answer:
+
+> No. Combiner is optional and Hadoop may or may not execute it.
+
+ Q3. What does Partitioner do?
+
+Answer:
+
+> Partitioner determines which Reducer receives a particular key.
+
+ Q4. What is the most important rule of Partitioner?
+
+Answer:
+
+> All records with the same key must be sent to the same Reducer.
+
+ Q5. What happens during Shuffle?
+
+Answer:
+
+> Hadoop transfers, sorts and groups Mapper output based on keys before sending the grouped data to the Reducer.
+
+ Q6. Why use Java Mapper?
+
+> Java provides native Hadoop MapReduce APIs and is traditionally used for Hadoop MapReduce applications.
+
+ Q7. Why use Python Mapper?
+
+> Python can be used with Hadoop Streaming, allowing Python programs to participate in the MapReduce framework through standard input and output.
+
+ Q8. What is the difference between Combiner and Reducer?
+Combiner → local aggregation → optimization
+Reducer  → final aggregation → final result
+
+
+ Q9. Does Partitioner aggregate data?
+
+> No. Partitioner only determines which Reducer receives a key.
+
+ Q10. What happens if the Partitioner sends the same key to different Reducers?
+
+> The aggregation can be split across Reducers, so the final result for that key would not be correctly combined. Therefore, the same key must always go to the same Reducer.
+
+
+# Final Exam Diagram to Remember
+
+//For Java project:
+
+HDFS Input
+    ↓
+Java Mapper
+    ↓
+Combiner
+    ↓
+Custom Partitioner
+    ↓
+Shuffle & Sort
+    ↓
+Java Reducer
+    ↓
+HDFS Output
+
+
+//For Python project:
+
+HDFS Input
+    ↓
+Python Mapper
+    ↓
+Python Combiner
+    ↓
+Default Partitioner
+    ↓
+Shuffle & Sort
+    ↓
+Python Reducer
+    ↓
+HDFS Output
+
+ It also gives you enough material to explain Mapper, Combiner, Partitioner, Shuffle, Reducer, HDFS, Java MapReduce, and Hadoop Streaming in a fresher-level Big Data Engineer interview.
+//////////////////////////////////////////////////////
+
+
+3. HBase Use Case: Customer 360 / Customer Profile
+
+//Business problem
+A telecom company has millions of customers. It needs very fast lookup of a customer's:
+Customer ID
+Name
+City
+Mobile number
+Plan
+Status
+Data usage
+
+
+HBase is suitable because customer information can be retrieved quickly using a Customer ID as the row key.
+
+//Flow
+Application
+    |
+    | Customer ID
+    v
++----------------------+
+|        HBase         |
+|                      |
+| customer_profiles    |
+|                      |
+| RowKey = CUST1001    |
+| RowKey = CUST1002    |
+| RowKey = CUST1003    |
++----------------------+
+    |
+    v
+Fast customer lookup
+
+
+//USE THESE:
+
+| HBase Command | Purpose                |
+
+| create      | Create table           |
+| put         | Insert / update data   |
+| get         | Read one row           |
+| scan        | Read multiple rows     |
+| delete      | Delete a column        |
+| deleteall   | Delete a row           |
+| count       | Count rows             |
+| describe    | Display table metadata |
+| disable     | Disable table          |
+| drop        | Remove table           |
+
+
+////////////////////////////////////////////////////////
+USE CASE 4:
+Online Learning Platform Analytics using Hive
+
+//Concepts
+Create a Hive database
+Create an Internal/Managed table
+Create an External table
+Load data using LOCAL INPATH
+Load data using HDFS INPATH
+Perform Inner Join
+Perform Outer Joins
+Perform Map-Side Join
+Perform Reduce-Side Join
+Create a Partitioned table
+Query partitioned data
+Understand when each concept is useful in a corporate environment
+
+//Problem Statement
+
+An online learning platform stores information about learners, courses, and course enrollments.
+
+The data engineering team needs to build a Hive-based analytics system to answer questions such as:
+
+Which learners are enrolled in which courses?
+Which courses have the highest number of enrollments?
+Which learners have not enrolled in any course?
+Which courses currently have no learners?
+How can small reference tables such as course information be joined efficiently with a large enrollment table?
+How can enrollment data be partitioned so that queries process only the required data?
+
+The organization wants to store raw data in HDFS and use Hive for SQL-based analytics.
+
+//DO THIS:
+1. Start Hadoop
+       ↓
+2. Create local CSV files
+       ↓
+3. Put raw data into HDFS
+       ↓
+4. Start Hive
+       ↓
+5. CREATE DATABASE
+       ↓
+6. CREATE MANAGED TABLE
+       ↓
+7. LOAD DATA LOCAL INPATH
+       ↓
+8. CREATE EXTERNAL TABLE
+       ↓
+9. LOAD DATA INPATH
+       ↓
+10. CREATE enrollment table
+       ↓
+11. INNER JOIN
+       ↓
+12. LEFT / RIGHT / FULL OUTER JOIN
+       ↓
+13. MAP-SIDE JOIN
+       ↓
+14. REDUCE-SIDE JOIN
+       ↓
+15. CREATE PARTITIONED TABLE
+       ↓
+16. INSERT INTO PARTITION
+       ↓
+17. SHOW PARTITIONS
+       ↓
+18. QUERY PARTITION
+       ↓
+19. Combine partition + JOIN
+
+///////////////////////////////////////////////////////////
+USE CASE 5: Mobile App Activity Log Analytics
+1. Problem Statement
+
+A company operates a mobile application used by thousands of customers every day.
+
+The application generates daily activity logs containing:
+
+User ID
+User name
+Event type
+Device type
+Event date
+Session duration
+
+The data engineering team receives these log files every day and stores them in HDFS.
+
+The company wants to use Hive to analyze the logs and generate reports such as:
+
+Which users generated application activity?
+How many users performed each type of event?
+What is the average session duration?
+How can user names be standardized before reporting?
+
+//create a custom Hive UDF that converts a user name into uppercase.
+
+//Technology Stack
+Linux / WSL
+Hadoop HDFS
+Hive 3.1.3
+Java 8
+Java UDF
+HiveQL
+
+Architecture:
+
+Mobile Application
+       |
+       v
+Daily Log Files
+       |
+       v
+HDFS Raw Layer
+       |
+       v
+Hive External Table
+       |
+       v
+Hive Query
+       |
+       +---- Custom UDF
+       |
+       v
+Analytics / Reports
+
+
+////////////////////////////////////////////////////////

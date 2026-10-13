@@ -1,0 +1,1111 @@
+//Use case for MapReduce with Spark, without Hadoop/HDFS.
+
+Use Case: Employee Department Salary Analysis using Spark
+
+// 1. Problem Statement
+
+A company has employee salary data stored in a CSV file.
+
+The requirement is to calculate:
+
+1. Total salary paid by each department
+2. Number of employees in each department
+3. Average salary of each department
+
+We will implement this using Apache Spark RDD MapReduce operations without using Hadoop or HDFS.
+
+// Input
+emp_id,name,department,salary
+101,Rahul,IT,60000
+102,Priya,HR,45000
+103,Arun,IT,70000
+104,Neha,Finance,55000
+105,Kiran,HR,50000
+106,Anita,Finance,65000
+107,Ravi,IT,80000
+
+
+// Expected Output
+Finance,2,120000,60000.0
+HR,2,95000,47500.0
+IT,3,210000,70000.0
+
+//Where:
+Department,Employee_Count,Total_Salary,Average_Salary
+
+# 2. Technology Stack
+
+| Component       | Technology             |
+
+| Programming     | Python                 |
+| Processing      | Apache Spark           |
+| API             | Spark RDD              |
+| Execution Mode  | Local                  |
+| Input           | Local CSV              |
+| Storage         | Local Linux filesystem |
+| Cluster Manager | None                   |
+| Hadoop/HDFS     | Not used               |
+| YARN            | Not used               |
+| Database        | Not required           |
+
+//The architecture is:
+Local CSV File
+      |
+      v
+ Apache Spark
+      |
+      v
+   RDD
+      |
+      +---- map()
+      |
+      +---- reduceByKey()
+      |
+      +---- mapValues()
+      |
+      v
+Local Output Directory
+
+
+3. Why Spark Without Hadoop?
+
+Normally you may see:
+
+
+Spark
+  |
+  v
+HDFS
+
+
+//But Spark does not require Hadoop/HDFS to process data.
+
+
+Local File
+    |
+    v
+Spark Local Mode
+    |
+    v
+Local Output
+
+
+//Spark can directly read:
+CSV
+TXT
+JSON
+Parquet
+from the local filesystem.
+
+For a beginner, this is a good way to understand Spark processing before introducing HDFS.
+
+4. Check Python
+
+Open Ubuntu/WSL terminal.
+
+
+python3 --version
+
+
+//Expected:
+
+
+Python 3.12.3
+
+
+//Check pip:
+
+
+pip3 --version
+
+
+# 5. Check Java
+
+Spark requires Java.
+
+
+java -version
+
+
+Your current Hadoop/HBase environment has Java 8, but Spark 4.x requires Java 17 or later.
+
+""""So for this particular Spark lab, use a Java 17+ environment.
+if you want to use java 8 keep spark version 3.x.x"""
+
+Check installed Java versions:
+ls /usr/lib/jvm/
+
+//You may see:
+java-8-openjdk-amd64
+java-11-openjdk-amd64
+java-17-openjdk-amd64
+java-21-openjdk-amd64
+
+
+//For Spark:
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
+
+//Verify:
+java -version
+
+
+Expected:
+
+
+openjdk version "17..."
+
+
+---
+
+# 6. Install PySpark
+
+Create a virtual environment.
+
+
+python3 -m venv ~/spark-venv
+
+
+Activate it:
+
+
+source ~/spark-venv/bin/activate
+
+
+You should see:
+
+
+(spark-venv)
+
+
+Upgrade pip:
+
+
+pip install --upgrade pip
+
+
+Install PySpark:
+
+
+pip install pyspark
+
+
+Check:
+
+
+pyspark --version
+
+
+Expected output will show your Spark version.
+
+For example:
+
+
+Welcome to
+      ____              __
+     / __/__  ___ _____/ /__
+    _\ \/ _ \/ _ `/ __/  '_/
+   /___/ .__/\_,_/_/ /_/\_\   version 4.x.x
+
+
+---
+
+# 7. Create Project Directory
+
+
+mkdir -p ~/spark-mapreduce-lab
+
+
+Go inside:
+
+
+cd ~/spark-mapreduce-lab
+
+
+Create folders:
+
+
+mkdir input output
+
+
+Check:
+
+
+tree
+
+
+If `tree` is not installed:
+
+
+find .
+
+
+Expected:
+
+
+.
+./input
+./output
+
+
+---
+
+# 8. Create Input CSV
+
+Create the file:
+
+
+nano input/employees.csv
+
+
+Enter:
+
+
+emp_id,name,department,salary
+101,Rahul,IT,60000
+102,Priya,HR,45000
+103,Arun,IT,70000
+104,Neha,Finance,55000
+105,Kiran,HR,50000
+106,Anita,Finance,65000
+107,Ravi,IT,80000
+
+
+Save:
+
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+Check:
+
+
+cat input/employees.csv
+
+
+---
+
+# 9. Understand the Input
+
+Our records are:
+
+
+101,Rahul,IT,60000
+102,Priya,HR,45000
+103,Arun,IT,70000
+104,Neha,Finance,55000
+105,Kiran,HR,50000
+106,Anita,Finance,65000
+107,Ravi,IT,80000
+
+
+For example:
+
+
+101,Rahul,IT,60000
+
+
+means:
+
+
+Employee ID = 101
+Name        = Rahul
+Department  = IT
+Salary      = 60000
+
+10. Spark MapReduce Concept
+
+We will use Spark RDD operations.
+
+The important operations are:
+
+
+File()
+   |
+   v
+map()
+   |
+   v
+reduceByKey()
+   |
+   v
+mapValues()
+   |
+   v
+sortByKey()
+   |
+   v
+saveAsFile()
+
+
+//The important MapReduce concept is:
+
+
+             MAP
+              |
+              v
+      (IT, (60000,1))
+      (HR, (45000,1))
+      (IT, (70000,1))
+      (Finance,(55000,1))
+              |
+              v
+           SHUFFLE
+              |
+              v
+        Same keys together
+              |
+              v
+          REDUCE
+              |
+              v
+     IT      -> (210000,3)
+     HR      -> (95000,2)
+     Finance -> (120000,2)
+
+
+# 11. Create Spark Program
+
+Create:
+
+
+nano employee_salary.py
+//
+from pyspark import SparkConf, SparkCon
+
+# Create Spark configuration
+conf = SparkConf().setAppName("EmployeeSalaryAnalysis").setMaster("local[*]")
+
+# Create SparkCon
+sc = SparkCon(conf=conf)
+
+# Read input file
+lines = sc.File("input/employees.csv")
+
+# Remove header
+header = lines.first()
+
+data = lines.filter(lambda line: line != header)
+
+# MAP
+# Convert each record into:
+# (department, (salary, employee_count))
+
+mapped = data.map(
+    lambda line: (
+        line.split(",")[2],
+        (int(line.split(",")[3]), 1)
+    )
+)
+
+# REDUCE
+# Add salaries and employee counts department-wise
+
+reduced = mapped.reduceByKey(
+    lambda x, y: (
+        x[0] + y[0],
+        x[1] + y[1]
+    )
+)
+
+# Calculate average salary
+
+result = reduced.mapValues(
+    lambda x: (
+        x[1],
+        x[0],
+        x[0] / x[1]
+    )
+)
+
+# Sort by department
+
+sorted_result = result.sortByKey()
+
+# Display result
+
+for department, values in sorted_result.collect():
+    employee_count = values[0]
+    total_salary = values[1]
+    average_salary = values[2]
+
+    print(
+        department,
+        employee_count,
+        total_salary,
+        average_salary
+    )
+
+# Save output
+
+output = sorted_result.map(
+    lambda x: (
+        x[0],
+        x[1][0],
+        x[1][1],
+        x[1][2]
+    )
+)
+
+output.map(lambda x: ",".join(map(str, x))) \
+      .coalesce(1) \
+      .saveAsFile("output/department_salary")
+
+# Stop Spark
+
+sc.stop()
+
+# 12. Understand the Mapper
+
+This section:
+
+python
+mapped = data.map(
+    lambda line: (
+        line.split(",")[2],
+        (int(line.split(",")[3]), 1)
+    )
+)
+
+
+is the Map operation.
+
+Input:
+
+
+101,Rahul,IT,60000
+
+
+Output:
+
+
+(IT,(60000,1))
+
+
+Another record:
+
+
+103,Arun,IT,70000
+
+
+becomes:
+
+
+(IT,(70000,1))
+
+
+Another:
+
+
+102,Priya,HR,45000
+
+
+becomes:
+
+
+(HR,(45000,1))
+
+
+So the mapper generates:
+
+
+IT      -> (60000,1)
+HR      -> (45000,1)
+IT      -> (70000,1)
+Finance -> (55000,1)
+HR      -> (50000,1)
+Finance -> (65000,1)
+IT      -> (80000,1)
+
+
+---
+
+# 13. Shuffle Stage
+
+The important operation is:
+
+python
+reduceByKey()
+
+
+Before reduction, Spark groups records having the same key.
+
+Conceptually:
+
+
+IT:
+(60000,1)
+(70000,1)
+(80000,1)
+
+HR:
+(45000,1)
+(50000,1)
+
+Finance:
+(55000,1)
+(65000,1)
+
+
+This grouping is the Shuffle stage.
+
+---
+
+# 14. Reduce Stage
+
+This code performs the reduction:
+
+python
+reduced = mapped.reduceByKey(
+    lambda x, y: (
+        x[0] + y[0],
+        x[1] + y[1]
+    )
+)
+
+
+For IT:
+
+
+(60000,1)
+(70000,1)
+(80000,1)
+
+
+Salary:
+
+
+60000 + 70000 + 80000
+
+
+Result:
+
+
+210000
+
+
+Employee count:
+
+
+1 + 1 + 1
+
+
+Result:
+
+
+3
+
+
+Therefore:
+
+
+IT -> (210000,3)
+
+
+For HR:
+
+
+45000 + 50000 = 95000
+
+
+and:
+
+
+1 + 1 = 2
+
+
+Therefore:
+
+
+HR -> (95000,2)
+
+
+Finance:
+
+
+55000 + 65000 = 120000
+
+
+and:
+
+
+1 + 1 = 2
+
+
+Therefore:
+
+
+Finance -> (120000,2)
+
+
+---
+
+# 15. Calculate Average
+
+This code:
+
+python
+result = reduced.mapValues(
+    lambda x: (
+        x[1],
+        x[0],
+        x[0] / x[1]
+    )
+)
+
+
+calculates:
+
+
+Average Salary = Total Salary / Employee Count
+
+
+For IT:
+
+
+210000 / 3 = 70000
+
+
+For HR:
+
+
+95000 / 2 = 47500
+
+
+For Finance:
+
+
+120000 / 2 = 60000
+
+# 16. Run the Spark Program
+
+From:
+
+
+cd ~/spark-mapreduce-lab
+
+
+make sure the virtual environment is active:
+
+
+source ~/spark-venv/bin/activate
+
+
+Run:
+
+
+spark-submit employee_salary.py
+
+
+Spark will start in:
+
+
+local[*]
+
+
+mode.
+
+`[*]` means Spark can use the available local CPU cores.
+
+
+17. Expected Console Output
+
+You should see Spark logs followed by something similar to:
+
+
+Finance 2 120000 60000.0
+HR 2 95000 47500.0
+IT 3 210000 70000.0
+
+
+The exact Spark log messages and formatting can vary by Spark version.
+
+
+# 18. Check Output Directory
+
+Run:
+ls output/department_salary
+
+You may see:
+_SUCCESS
+part-00000-xxxxxxxx
+
+Spark normally creates a directory, not a single output file.
+
+19. View Output
+
+Run:
+cat output/department_salary/part-*
+
+
+Expected:
+
+
+Finance,2,120000,60000.0
+HR,2,95000,47500.0
+IT,3,210000,70000.0
+
+
+---
+
+# 20. Complete Execution Flow
+
+For your lab exam, explain it like this:
+
+
+employees.csv
+     |
+     v
+SparkCon
+     |
+     v
+sc.File()
+     |
+     v
+Remove Header
+     |
+     v
+MAP
+     |
+     v
+(department,(salary,1))
+     |
+     v
+SHUFFLE
+     |
+     v
+Group by Department
+     |
+     v
+REDUCE
+     |
+     v
+(department,(total_salary,count))
+     |
+     v
+Calculate Average
+     |
+     v
+Sort
+     |
+     v
+Local Output
+
+
+---
+
+# 21. Map, Shuffle and Reduce Identification
+
+| Stage          | Spark operation    | Purpose                            
+
+| Input          | `File()`       | Read CSV                           |
+| Map            | `map()`            | Convert records to key-value pairs |
+| Shuffle        | `reduceByKey()`    | Group same department keys         |
+| Reduce         | `reduceByKey()`    | Aggregate salary and count         |
+| Transformation | `mapValues()`      | Calculate average                  |
+| Output         | `saveAsFile()` | Write local result                 |
+
+Important point:
+
+In Spark, `reduceByKey()` logically includes both the shuffle/grouping and reduction behavior. You don't write separate `shuffle()` and `reduce()` functions.
+
+---
+
+# 22. No Hadoop Components Used
+
+This project does not use:
+
+
+HDFS
+YARN
+NameNode
+DataNode
+ResourceManager
+NodeManager
+Hadoop MapReduce
+
+
+Instead:
+
+
+Local Filesystem
+       |
+       v
+Apache Spark
+       |
+       v
+Local Filesystem
+
+
+The processing engine is:
+
+
+Apache Spark
+
+
+and execution mode is:
+
+
+local[*]
+
+
+---
+
+# 23. Why Use RDD Here?
+
+RDD stands for:
+
+Resilient Distributed Dataset
+
+RDD is Spark's basic distributed data abstraction.
+
+For learning MapReduce concepts, RDD is useful because operations such as:
+
+python
+map()
+reduceByKey()
+filter()
+flatMap()
+
+
+make the MapReduce logic easy to understand.
+
+For example:
+
+python
+data.map(...)
+
+
+is the Map-style transformation.
+
+And:
+
+python
+data.reduceByKey(...)
+
+
+performs key-based aggregation.
+
+---
+
+# 24. Interview Explanation
+
+If interviewer asks:
+
+// "What is your project?"
+
+You can say:
+
+> I implemented an Employee Department Salary Analysis project using Apache Spark RDDs. The input is a CSV file stored in the local filesystem. Spark reads the data using `File()`, removes the header, and uses `map()` to create department-based key-value pairs. `reduceByKey()` groups records by department and calculates total salary and employee count. Then `mapValues()` calculates the average salary. The final result is written to the local filesystem. The application runs in Spark local mode and does not use Hadoop, HDFS, or YARN.
+
+---
+
+# 25. If Examiner Asks "Where is MapReduce?"
+
+Explain:
+
+
+MAP
+
+
+is:
+
+python
+data.map(...)
+
+
+It converts:
+
+
+101,Rahul,IT,60000
+
+
+into:
+
+
+(IT,(60000,1))
+
+
+Then:
+
+
+SHUFFLE
+
+
+groups:
+
+
+IT -> (60000,1)
+IT -> (70000,1)
+IT -> (80000,1)
+
+
+Then:
+
+
+REDUCE
+
+
+produces:
+
+
+IT -> (210000,3)
+
+
+So the MapReduce concept is:
+
+
+Input
+  ↓
+MAP
+  ↓
+Shuffle
+  ↓
+REDUCE
+  ↓
+Result
+
+
+---
+
+# 26. One Important Difference From Hadoop MapReduce
+
+// Hadoop MapReduce
+
+
+Input
+ ↓
+Mapper
+ ↓
+Shuffle
+ ↓
+Reducer
+ ↓
+HDFS
+
+
+// Spark RDD MapReduce-style processing
+
+
+Local Input
+ ↓
+Spark RDD
+ ↓
+map()
+ ↓
+reduceByKey()
+ ↓
+Local Output
+
+
+Spark keeps intermediate data in memory when possible, whereas traditional Hadoop MapReduce heavily relies on disk-based intermediate processing.
+
+---
+
+# 27. Clean Lab Commands — Short Version
+
+If you need only the commands during the practical exam:
+
+
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
+
+
+python3 -m venv ~/spark-venv
+source ~/spark-venv/bin/activate
+pip install pyspark
+
+
+
+mkdir -p ~/spark-mapreduce-lab/input
+mkdir -p ~/spark-mapreduce-lab/output
+cd ~/spark-mapreduce-lab
+
+
+
+nano input/employees.csv
+
+
+Add:
+
+
+emp_id,name,department,salary
+101,Rahul,IT,60000
+102,Priya,HR,45000
+103,Arun,IT,70000
+104,Neha,Finance,55000
+105,Kiran,HR,50000
+106,Anita,Finance,65000
+107,Ravi,IT,80000
+
+
+Create:
+
+
+nano employee_salary.py
+
+
+Paste the Spark program above.
+
+Run:
+
+
+spark-submit employee_salary.py
+
+
+Check:
+
+
+cat output/department_salary/part-*
+
+
+Expected:
+
+
+Finance,2,120000,60000.0
+HR,2,95000,47500.0
+IT,3,210000,70000.0
+
+
+// Final architecture to remember
+
+
+              EMPLOYEE CSV
+                   |
+                   v
+          Local File System
+                   |
+                   v
+             Spark RDD
+                   |
+                   v
+                 MAP
+                   |
+                   v
+          (Department, Salary)
+                   |
+                   v
+               SHUFFLE
+                   |
+                   v
+          Same departments
+              grouped
+                   |
+                   v
+                REDUCE
+                   |
+                   v
+      Total Salary + Count
+                   |
+                   v
+          Average Salary
+                   |
+                   v
+          Local Output
+
+
+This is a pure Spark MapReduce-style lab: no HDFS, no YARN, and no Hadoop MapReduce.

@@ -1,0 +1,969 @@
+100 scenario-based multiple-choice questions (MCQs) designed for Big Data Engineer and Hadoop Engineer roles (0-2 years experience), based strictly on the provided teaching guidelines for PGCP-BDA, ACTS, Pune (Feb 2026).
+
+Sections 1-3: Introduction to Big Data & Hadoop (Q1-Q10)
+
+Q1. Your team is evaluating cloud platforms to run Hadoop and Spark workloads. You need a managed Spark service with a collaborative notebook environment. Which service should you prioritize exploring as per the course?
+a) AWS EMR
+b) Azure HDInsight
+c) Databricks Community Edition
+d) Google Cloud Dataproc
+
+Answer: c) Databricks Community Edition
+Explanation: The "Self Learning" section explicitly mentions exploring "DataBricks community edition for Spark Programming" as a key activity for cloud-based Spark work.
+
+Q2. A data analyst argues that Big Data is just a marketing hype. As a junior engineer, which point best counters this argument using the course's "Beyond the Hype" concept?
+a) Big Data only applies to social media companies.
+b) The "Changing Nature of Data Repositories" and "Data Sharing" practices prove its evolving necessity.
+c) Traditional databases can handle all data types at any speed.
+d) Big Data technologies are only for storage, not analysis.
+
+Answer: b) The "Changing Nature of Data Repositories" and "Data Sharing" practices prove its evolving necessity.
+Explanation: The syllabus specifically includes "Changing Nature of Data Repositories" and "Data Sharing and Reuse Practices" to show Big Data's practical, evolving role.
+
+Q3. Your company wants to adopt Hadoop but is worried about vendor lock-in. Which aspect of the Hadoop ecosystem supports using distributions from multiple vendors?
+a) HDFS Architecture
+b) Hadoop Distributions and Vendors (e.g., Cloudera, MapR)
+c) MapReduce Daemons
+d) HBase Security
+
+Answer: b) Hadoop Distributions and Vendors (e.g., Cloudera, MapR)
+Explanation: The course includes "Hadoop Distributions and Vendors" as a topic, acknowledging that multiple commercial and open-source options exist.
+
+Q4. You are designing a data curation workflow. Which concept, mentioned in the syllabus, deals with the end-of-life of a dataset?
+a) Data Rescue And Dissemination
+b) OpenExit: Reaching the End of The Data Life Cycle
+c) Curation of Scientific Data at Risk of Loss
+d) Overlooked and Overrated Data Sharing
+
+Answer: b) OpenExit: Reaching the End of The Data Life Cycle
+Explanation: Directly from the syllabus's list of topics under "Introduction to Big Data."
+
+Q5. A research team has old, valuable scientific data on deteriorating tapes. Which concept from the syllabus directly addresses this "data at risk of loss" scenario?
+a) Meta-Repositories for Data
+b) Data Rescue And Dissemination
+c) Hadoop Distributed File System
+d) MapReduce Streaming
+
+Answer: b) Data Rescue And Dissemination
+Explanation: The syllabus includes "Curation of Scientific Data at Risk of Loss: Data Rescue And Dissemination" as a specific topic.
+
+Q6. You need to explain the evolution of data storage to a colleague. According to the syllabus, what is the correct order?
+a) Hadoop -> Traditional DB -> NoSQL
+b) SQL -> NoSQL -> Hadoop
+c) Traditional DB -> Evolution of Hadoop -> Modern Distributed Systems
+d) Cloud Storage -> HDFS -> MapReduce
+
+Answer: c) Traditional DB -> Evolution of Hadoop -> Modern Distributed Systems
+Explanation: The syllabus includes "A Brief History of Hadoop" and "Evolution of Hadoop" after introducing Big Data concepts, implying this progression.
+
+Q7. As a new Hadoop engineer, you are told to use a distribution that includes administrative tools. What does "Hadoop Distributions" typically provide beyond core Apache Hadoop?
+a) Only the HDFS component
+b) A different programming language for MapReduce
+c) Additional management, security, and integration tools
+d) A replacement for the Linux operating system
+
+Answer: c) Additional management, security, and integration tools
+Explanation: Distributions from vendors aim to simplify deployment, management, and security, adding value over the bare Apache version.
+
+Q8. Your company wants to share non-sensitive operational data with a partner for research, but the data is messy. The syllabus mentions "Data Sharing and Reuse Practices" and implications for "Repository Data Curation." What is your first step?
+a) Immediately copy the raw data to the partner.
+b) Apply data curation practices to clean, document, and format the data for reuse.
+c) Delete all data and ask the partner to generate their own.
+d) Use only a single Excel sheet for sharing.
+
+Answer: b) Apply data curation practices to clean, document, and format the data for reuse.
+Explanation: The topic directly discusses the "Implications for Repository Data Curation" to enable effective sharing and reuse.
+
+Q9. You are comparing AWS EMR, Azure HDInsight, and GCP Dataproc for a new project. What is the primary benefit of using these over a self-managed on-premise Hadoop cluster?
+a) They offer unlimited free storage.
+b) They eliminate the need for any Hadoop knowledge.
+c) They provide managed services, reducing operational overhead (provisioning, scaling, maintenance).
+d) They are always faster than any on-premise cluster.
+
+Answer: c) They provide managed services, reducing operational overhead (provisioning, scaling, maintenance).
+Explanation: The self-learning objective to "Explore the Cloud service provider... services for Hadoop and Spark" and "Compare these services" is aimed at understanding managed service benefits.
+
+Q10. Your manager asks about the core conceptual difference between Big Data technologies and traditional RDBMS for analytics. Based on the "Introduction to Big Data," what is a key shift?
+a) Big Data only uses structured data.
+b) Big Data relies on a single, powerful server.
+c) Big Data embraces diverse data types (structured, semi-structured, unstructured) and distributed processing.
+d) Big Data has no security or data governance needs.
+
+Answer: c) Big Data embraces diverse data types (structured, semi-structured, unstructured) and distributed processing.
+Explanation: The course covers "Research and Changing Nature of Data Repositories," highlighting the move beyond rigid, structured-only systems.
+
+
+
+ Sections 4-6: HDFS Architecture & Setup (Q11-Q25)
+
+Q11. Your 5-node Hadoop cluster (1 NameNode, 4 DataNodes) experiences a sudden power outage affecting only the physical machine running the NameNode. What is the immediate impact on data availability for client applications?
+a) All data is lost permanently.
+b) Clients can still read all data by connecting directly to DataNodes.
+c) Clients cannot read or write any data because the NameNode is unavailable, even though data blocks exist on DataNodes.
+d) Clients can write new data, but cannot read old data.
+
+Answer: c) Clients cannot read or write any data because the NameNode is unavailable, even though data blocks exist on DataNodes.
+Explanation: The NameNode is the master server managing the filesystem namespace and client access. Without it, the cluster is unavailable. DataNodes hold blocks but need the NameNode for metadata.
+
+Q12. You are setting up a single-node Hadoop cluster on your laptop for development. The course suggests a pseudo-distributed deployment. What does this mean?
+a) All Hadoop daemons (NameNode, DataNode, etc.) run as separate processes on the same machine.
+b) Each Hadoop daemon runs on a separate physical laptop.
+c) The cluster uses a container orchestration tool like Kubernetes.
+d) Only the NameNode and DataNode run, but not the ResourceManager.
+
+Answer: a) All Hadoop daemons (NameNode, DataNode, etc.) run as separate processes on the same machine.
+Explanation: Pseudo-distributed mode simulates a full cluster on a single machine by running each daemon in its own JVM process.
+
+Q13. You have a 200MB file stored on HDFS with a default block size of 128MB and replication factor of 3. How many total blocks (physical copies) are stored across the cluster?
+a) 1 block (128MB) + 1 block (72MB) = 2 logical blocks, replicated 3 times = 6 physical blocks.
+b) 200MB / 128MB = 1.56 -> 2 logical blocks. Total replicas = 2 blocks  3 replicas = 6 physical blocks.
+c) Only 2 physical blocks because the second block is too small to replicate.
+d) 200MB / 128MB = 1.56 -> 2 logical blocks. Total replicas = 2 blocks  3 replicas = 6 physical blocks, plus the original = 7.
+
+Answer: b) 200MB / 128MB = 1.56 -> 2 logical blocks. Total replicas = 2 blocks  3 replicas = 6 physical blocks.
+Explanation: HDFS splits the file into logical blocks. Each block is replicated according to the replication factor. Two logical blocks  3 replicas each = 6 total physical block copies.
+
+Q14. You are using the `hdfs dfs -put` command. The process fails because one of the three DataNodes that should receive a block replica has crashed. What happens?
+a) The entire command fails and the file is not written.
+b) The NameNode writes to the two healthy DataNodes and ignores the third replica requirement.
+c) The pipeline is re-established with two healthy DataNodes, and the third replica is written to another DataNode. The command succeeds.
+d) The command hangs indefinitely until the DataNode comes back online.
+
+Answer: c) The pipeline is re-established with two healthy DataNodes, and the third replica is written to another DataNode. The command succeeds.
+Explanation: HDFS data pipelining is fault-tolerant. If a DataNode fails during write, the pipeline closes, the block is sent to the remaining nodes, and the NameNode finds a new location for the missing replica.
+
+Q15. Your organization uses a Hadoop cluster spread across two physical server racks (Rack A and Rack B). Rack awareness is enabled. A client on Rack A writes a new file with replication factor 3. Where will the replicas likely be placed?
+a) All three replicas on any three random DataNodes in the cluster.
+b) One replica on a DataNode in Rack A (same rack as client), and two replicas on a different DataNode in Rack B (different rack).
+c) Two replicas on two different DataNodes in Rack A, and one replica on a DataNode in Rack B.
+d) One replica on the client machine itself, and two replicas on any DataNodes.
+
+Answer: b) One replica on a DataNode in Rack A (same rack as client), and two replicas on different DataNodes in Rack B (different rack).
+
+Explanation:
+HDFS uses a rack-aware replica placement policy to balance reliability and network efficiency:
+First replica → placed on a DataNode in the same rack as the client (Rack A in this case). This reduces write latency since the client and DataNode are close.
+Second replica → placed on a DataNode in a different rack (Rack B), ensuring fault tolerance in case an entire rack fails.
+Third replica → placed on another DataNode in the same remote rack (Rack B), but on a different node than the second replica. This minimizes cross-rack traffic while still providing redundancy.
+This strategy ensures:
+Fault tolerance (data survives rack failure).
+Load balancing (replicas spread across racks).
+Reduced network overhead (only one cross-rack write).
+So the placement is 1 replica in Rack A + 2 replicas in Rack B.
+
+Q16. You accidentally deleted a critical HDFS directory using `hdfs dfs -rm -r`. Your cluster has a trash feature enabled (`fs.trash.interval` set to 1440 minutes). How can you recover the data?
+a) Restore from a physical backup tape.
+b) Run `hdfs dfs -mv` from the `/user/hdfs/.Trash` directory to its original location.
+c) Reboot the entire Hadoop cluster.
+d) The data is gone forever once you use `-rm -r`.
+
+Answer: b) Run `hdfs dfs -mv` from the `/user/hdfs/.Trash` directory to its original location.
+Explanation: When trash is enabled, deleted files are moved to a Trash directory. They can be restored by moving them back before the retention period expires.
+
+Q17. You are setting up a Docker container for a pseudo-distributed Hadoop cluster as per the self-learning task. What is the primary challenge regarding container lifecycles?
+a) Docker cannot run Java applications.
+b) Hadoop daemons cannot run inside a container.
+c) Data persisted inside the container will be lost when the container terminates unless a volume is used.
+d) Docker containers cannot communicate over a network.
+
+Answer: c) Data persisted inside the container will be lost when the container terminates unless a volume is used.
+Explanation: Containers are ephemeral by default. To persist HDFS data or configurations, you must mount a host directory or Docker volume to the container.
+
+Q18. Your DataNode has 4TB of disk space, but the HDFS capacity reported is only 3.6TB. What is the most likely reason?
+a) The NameNode is misconfigured.
+b) A portion of the disk is reserved for non-HDFS operations (e.g., `dfs.datanode.du.reserved`).
+c) The block size is set too high.
+d) There is a network partition.
+
+Answer: b) A portion of the disk is reserved for non-HDFS operations (e.g., `dfs.datanode.du.reserved`).
+Explanation: The `dfs.datanode.du.reserved` configuration reserves space on the DataNode's disk for non-HDFS filesystem operations and to prevent the disk from filling up completely.
+
+Q19. You need to SSH into a remote Hadoop node from Windows. Which tool is explicitly mentioned in the syllabus for this?
+a) Windows Command Prompt
+b) PowerShell
+c) Putty
+d) Cygwin
+
+Answer: c) Putty
+Explanation: The syllabus for "Remote Login" explicitly lists "Putty/Mac Terminal/Ubuntu Terminal".
+
+Q20. One DataNode in your 10-node cluster is very slow, causing entire HDFS write operations to be delayed. Which HDFS feature allows the NameNode to stop assigning work to this problematic node?
+a) Rebalancer
+b) Node decommissioning
+c) Fencing
+d) Node blacklisting
+
+Answer: b) Node decommissioning (for admin control)
+OR
+Blacklisting is temporary and internal, not a primary admin feature
+//Interview-safe explanation:
+Hadoop internally avoids bad nodes
+But admins typically:
+Decommission nodes
+Or fix hardware/network issues
+
+Q21. You are running an HDFS balancer because some DataNodes have 90% storage utilization while others have 20%. What is the balancer's main goal?
+a) To increase the replication factor of popular files.
+b) To move data from high-utilization to low-utilization DataNodes without violating replication policies.
+c) To delete old data to free up space.
+d) To compress existing HDFS files.
+
+Answer: b) To move data from high-utilization to low-utilization DataNodes without violating replication policies.
+Explanation: The HDFS Balancer tool tries to make block distribution more even across DataNodes to avoid hot spots.
+
+Q22. A new DataNode is added to a running cluster. How long does it typically take for the NameNode to start sending it work?
+a) Immediately after adding the host to the `include` file and refreshing nodes.
+b) After a full cluster restart.
+c) Only after re-formatting the NameNode.
+d) It never receives work unless manually triggered by an admin command.
+
+Answer: a) Immediately after adding the host to the `include` file and refreshing nodes.
+Explanation: Hadoop supports dynamic addition of nodes. After updating the `dfs.hosts` file and running `hdfs dfsadmin -refreshNodes`, the NameNode will start adding the new node.
+
+Q23. You are troubleshooting and need to see the list of running HDFS daemons on a specific node. Which command sequence is most appropriate?
+a) `ps aux | grep -E 'NameNode|DataNode|SecondaryNameNode'`
+b) `hdfs dfs -ls /daemons`
+c) `mapred job -list`
+d) `yarn application -list`
+
+Answer: a) `ps aux | grep -E 'NameNode|DataNode|SecondaryNameNode'`
+Explanation: The `ps` (process status) command with `grep` is a standard Linux way to check running processes. You would look for the Java process names of the daemons.
+
+Q24. In a non-HA (High Availability) setup, your SecondaryNameNode (SNN) has not been receiving checkpoints. What is the most immediate operational risk?
+a) The DataNodes will stop working immediately.
+b) HDFS read speed will drop to zero.
+c) If the NameNode crashes, the metadata edit log will be huge, causing very long recovery times.
+d) HDFS write speed will increase dramatically.
+
+Answer: c) If the NameNode crashes, the metadata edit log will be huge, causing very long recovery times.
+Explanation: The SNN's job is to merge the edit log into the fsimage. Without this, the NameNode's edit log grows unchecked. On restart, it would have to replay a massive log, leading to extreme downtime.
+
+Q25. You see "INFO util.GSet: Computing capacity for map=Collections" in your NameNode logs. What is this process related to?
+a) Reading a file from HDFS
+b) Allocating new block IDs
+c) Performing a memory-intensive operation like building the blockmap during startup or lease recovery.
+d) A regular heartbeat from a DataNode
+
+Answer: c) Performing a memory-intensive operation like building the blockmap during startup or lease recovery.
+Explanation: This log message appears when the NameNode is building critical in-memory data structures, often during startup or after a failover, indicating memory pressure.
+
+
+
+ Sections 7-10: MapReduce Framework & Programming (Q26-Q40)
+
+Q26. You are running a MapReduce job to filter out records where age < 18 and then group by city. You want to reduce network traffic by performing the filtering before data is sent over the network. Which component allows this?
+a) Partitioner
+b) Combiner (acting as a local reducer after the map phase)
+c) InputFormat
+d) The Reducer itself
+
+Answer: d) Mapper itself (filter in map phase)
+Correct Explanation:
+Filtering should be done in Mapper
+Combiner:
+Optional
+May or may not execute
+Only safe for aggregation
+
+Q27. Your MapReduce job has 100 mappers and 10 reducers. You need to ensure that all records for the same user ID (the key) go to the same reducer. Which component guarantees this?
+a) Input Split
+b) Combiner
+c) Partitioner (specifically `HashPartitioner` for user IDs)
+d) OutputFormat
+
+Answer: c) Partitioner (specifically `HashPartitioner` for user IDs)
+Explanation: The Partitioner determines which reducer receives a given (key, value) pair. The default `HashPartitioner` computes a hash of the key mod the number of reducers, ensuring same keys go to same reducer.
+
+Q28. You have a massive amount of data on HDFS, but your processing logic is simple: count the number of lines containing the word "ERROR". No aggregation across mappers is needed. What kind of MapReduce job is most efficient?
+a) A full job with both Map and Reduce phases.
+b) A Map-only job (set number of reducers to 0).
+c) A job with a custom InputFormat that bypasses mapping.
+d) A job that uses a very high number of reducers.
+
+Answer: b) A Map-only job (set number of reducers to 0).
+Explanation: Since you don't need to aggregate results across mappers, you can set `job.setNumReduceTasks(0)`. Each mapper's output is written directly to HDFS as a separate file.
+
+Q29. You are writing a MapReduce job to find the maximum temperature per year from weather data. The mapper emits (Year, Temperature). The reducer should only output the maximum temperature. You want to combine the results per mapper locally. Is a Combiner that takes (Year, Temperature) and outputs (Year, Max_Temp_for_that_mapper) safe to use?
+a) No, combiners can never be used.
+b) Yes, because the max operation is associative and commutative.
+c) Yes, but only if you are using a custom partitioner.
+d) No, because the reducer logic is different from the combiner logic.
+
+Answer: b) Yes, because the max operation is associative and commutative.
+Explanation: The `max` function applied to a set of values is both associative (max(a, max(b,c)) = max(max(a,b), c)) and commutative (order doesn't matter), making it a perfect candidate for a Combiner.
+
+Q30. Your MapReduce job is running slowly. You suspect that a single mapper is processing a very large input split because some records are huge (e.g., a 1GB log line each). What is the underlying issue?
+a) Too many reducers.
+b) A poorly configured `mapreduce.input.lineinputformat.linespermap`.
+c) Inefficient combiner logic.
+d) Not enough DataNodes.
+
+Answer: b) A poorly configured `mapreduce.input.lineinputformat.linespermap` or `mapreduce.input.fileinputformat.split.minsize`.
+Explanation: `NLineInputFormat` or controlling split sizes can help. A single "huge record" can make one split and thus one mapper huge, causing skew. The split boundary concept fails if a record itself is gigabytes.
+
+The real issue is:
+
+Hadoop cannot split a single record across multiple mappers
+
+Q31. You need to add a small reference file (e.g., a list of state codes mapping) for every mapper in your MapReduce job. The file is 2MB. What is the most efficient way to do this?
+a) Read the file from HDFS in the `setup()` method of each mapper.
+b) Use the Distributed Cache.
+c) Put the file onto every DataNode manually.
+d) Encode the mapping directly into the mapper Java class as a static string.
+
+Answer: b) Use the Distributed Cache.
+Explanation: The Distributed Cache efficiently copies a read-only file to each node that runs map tasks, making it available locally. This avoids HDFS read overhead in each mapper's `map()` call.
+
+Q32. You are using a custom `Writable` to represent a complex object in MapReduce. Why is it important to implement this interface?
+a) It allows the object to be written to and read from the Hadoop serialization framework (efficiently).
+b) It allows the object to be displayed in the Hadoop Web UI.
+c) It is required for the object to be used as an output key.
+d) It automatically adds compression to the object.
+
+Answer: a) It allows the object to be written to and read from the Hadoop serialization framework (efficiently).
+Explanation: Hadoop uses its own serialization (Writable) instead of Java's Serializable for performance and compactness.
+
+Q33. Your self-learning task was to automate a MapReduce job using a shell script and schedule it daily at 10 AM using `cron`. The script works when run manually, but the cron job fails. What is the most likely cause?
+a) Hadoop is not installed on the cron server.
+b) The cron environment does not have the same `HADOOP_HOME`, `JAVA_HOME`, or `PATH` variables as your interactive shell.
+c) The script uses the wrong file extension.
+d) Cron cannot execute `.sh` scripts.
+
+Answer: b) The cron environment does not have the same `HADOOP_HOME`, `JAVA_HOME`, or `PATH` variables as your interactive shell.
+Explanation: Cron runs with a minimal set of environment variables. You must explicitly set environment variables like `JAVA_HOME`, `HADOOP_HOME`, and `PATH` inside your shell script for cron to find the Hadoop commands.
+
+Q34. You are processing a dataset where you need to join a large user log file with a moderately sized department file. The log file is 500GB, the department file is 10GB. You want to avoid a massive shuffle. Which technique is best?
+a) Perform a reduce-side join.
+b) Use a Map-side join with the department file loaded into a `HashMap` in the `setup()` method via Distributed Cache.
+c) Filter the log file to exclude most rows first.
+d) Increase the replication factor of the department file.
+
+Answer: a) Perform a reduce-side join
+“10GB might fit in memory”. In real-world Hadoop: Mapper JVM memory is typically 1–4 GB (sometimes 8–16 GB). Loading a 10GB file into a HashMap per mapper is: Not practical, Not scalable, Likely to cause Out Of Memory Error
+//Map-side join works ONLY when:
+One dataset is very small. Typically: MBs → safe, Few 100 MB → maybe, GBs → risky, 10GB → No
+//What should be done instead?
+Reduce-side join. Both datasets are: Shuffled, Sorted, Joined in reducer
+Yes, shuffle cost exists. But it's the correct and safe approach
+
+Q35. You want to use Python to write a MapReduce job instead of Java. Which feature enables this?
+a) Hadoop Pipes
+b) MapReduce Streaming
+c) PyHadoopLib
+d) HiveQL
+
+Answer: b) MapReduce Streaming
+Explanation: Hadoop Streaming allows you to use any executable or script (e.g., Python, Ruby, Bash) as a mapper or reducer. It communicates via standard input and output.
+
+Q36. Looking at the `mapred-site.xml`, you see the parameter `mapreduce.map.speculative` set to `true`. What does this setting do?
+a) It predicts the output size of each map task.
+b) It runs backup copies of slow-running map tasks on other nodes and kills the original one when the backup finishes.
+c) It enables encryption for map outputs.
+d) It forces all maps to run on the same node.
+
+Answer: b) It runs backup copies of slow-running map tasks on other nodes and kills the original one when the backup finishes.
+Explanation: Speculative execution is a Hadoop optimization for stragglers (slow tasks). It launches a duplicate task elsewhere and takes the result of whichever finishes first.
+
+Q37. You have a MapReduce job where the key set is large, and the reducer output needs to be globally sorted by key. What API can help you achieve this efficiently?
+a) `TotalOrderPartitioner`
+b) `HashPartitioner`
+c) `FailJobPartitioner`
+d) `KeyFieldPartitioner`
+
+Answer: a) `TotalOrderPartitioner`
+Explanation: The self-learning task explicitly mentions exploring the `TotalOrderPartitioner` API for globally sorted output. It samples the key distribution and creates partitions that result in sorted output.
+
+Q38. You are running a `hadoop jar` command, but the job fails with `java.lang.OutOfMemoryError: GC overhead limit exceeded`. Which configuration parameter would you likely increase to mitigate this for a single task attempt?
+a) `mapreduce.map.memory.mb`
+b) `mapreduce.reduce.cpu.vcores`
+c) `dfs.block.size`
+d) `mapreduce.job.reduces`
+
+Answer: a) `mapreduce.map.memory.mb` (or `reduce.memory.mb` depending on where it failed)
+Explanation: This error indicates the JVM for a task (mapper or reducer) has run out of heap space. Increasing the memory allocated to the task container can help.
+
+Q39. You are writing a custom `WritableComparable` for a composite key (Year, Month). You want the default shuffle to sort by Year first, then Month. Where is this sorting logic implemented?
+a) In the `write()` method.
+b) In the `compareTo()` method.
+c) In your custom Partitioner.
+d) In the `toString()` method.
+
+Answer: b) In the `compareTo()` method.
+Explanation: The `compareTo()` method defines the natural ordering of your custom key. During the shuffle/sort phase, Hadoop uses this method to sort the intermediate keys.
+
+Q40. Your MapReduce job uses a counter to track bad records. You increment the counter using `context.getCounter("MyCounters", "BadRecords").increment(1)`. After the job finishes, where can you see the final counter value?
+a) Only in the mapper's stdout logs.
+b) In the Hadoop job history Web UI or command-line output of the job.
+c) In a special file on each DataNode.
+d) The counter value is not persisted after a job finishes.
+
+Answer: b) In the Hadoop job history Web UI or command-line output of the job.
+Explanation: Counters are aggregated across all tasks and reported in the job's final status, accessible via the ResourceManager Web UI or `mapred job -status <job_id>`.
+
+
+
+ Sections 13-14: HBase (Q41-Q50)
+
+Q41. Your application requires real-time read/write access to a billion-row dataset, with a schema that changes frequently. You need random lookups by row key. Which storage system from the syllabus is most suitable?
+a) Hive (ACID table)
+b) HBase
+c) MapReduce sequence files
+d) Pig relation
+
+Answer: b) HBase
+Explanation: HBase is designed for real-time, random read/write access to massive, sparse, and schema-less datasets on top of HDFS.
+
+Q42. Your HBase table is very wide (many columns). You frequently need to access a subset of columns for a given row key. How can you design your application to be most efficient?
+a) Retrieve the entire row and filter on the client side.
+b) Use `ColumnFamily` groupings and specify `get.addColumn(family, qualifier)` or use a `ColumnPaginationFilter`.
+c) Create a separate HBase table for each column.
+d) Use HiveQL to query the HBase table.
+
+Answer: b) Use `ColumnFamily` groupings and specify `get.addColumn(family, qualifier)` or use a `ColumnPaginationFilter`.
+Explanation: Retrieving only the needed columns reduces network I/O and server-side load. Grouping commonly accessed columns into the same ColumnFamily also improves locality.
+
+Q43. You are writing a Java client for HBase. You need to atomically increment a counter column in a specific row. Which HBase operation should you use?
+a) `Put` with a timestamp.
+b) `Append`
+c) `incrementColumnValue()`
+d) `checkAndPut`
+
+Answer: c) `incrementColumnValue()`
+Explanation: `incrementColumnValue` is an atomic operation in HBase, specifically designed for counters. It reads the current value, increments it, and writes it back, all within a row lock.
+
+Q44. An HBase table named `emp_details` has a column family `personal`. You want to delete the entire column family. Which command correctly achieves this?
+a) `delete 'emp_details', 'personal'`
+b) `alter 'emp_details', {NAME => 'personal', METHOD => 'delete'}`
+c) `drop 'emp_details', 'personal'`
+d) `remove 'emp_details', 'personal'`
+
+Answer: b) `alter 'emp_details', {NAME => 'personal', METHOD => 'delete'}`
+Explanation: Column families are schema-level changes. You must alter the table to delete a column family. The table needs to be disabled first (or use `disable`/`enable` around the alter).
+
+Q45. You query `GET 'user_events', 'user123'` in HBase shell and get back the latest version of each cell. How does HBase versioning work by default?
+a) It stores only one version (the latest) and overwrites it.
+b) It stores up to 3 versions by default, timestamped, and returns the latest.
+c) It stores unlimited versions forever.
+d) It stores versions in a separate table.
+
+Answer: b) It stores up to 3 versions by default, timestamped, and returns the latest.
+Explanation: HBase maintains versioned cells using timestamps. The default maximum number of versions per column is 3 (configured per column family).
+
+Q46. Your HBase region server crashes. HBase automatically recovers the regions that were hosted there. On which component do these regions first become available for assignment?
+a) The Master node immediately.
+b) The HDFS NameNode.
+c) A designated backup RegionServer.
+d) They remain offline and must be recovered manually using HBase shell.
+
+Answer: a) The Master node immediately (followed by assignment to other RegionServers).
+Explanation: The HBase Master watches the RegionServer's ZooKeeper session. When the session times out, the Master assigns the crashed server's regions to other active RegionServers.
+
+Q47. You are performing a major compaction on an HBase table. What is the primary benefit of this operation?
+a) It increases the write throughput.
+b) It creates new HFiles by merging several smaller ones, removes deleted/expired cells, and improves read performance.
+c) It splits a hot region into two smaller regions.
+d) It backs up the table to a secondary HDFS cluster.
+
+Answer: b) It creates new HFiles by merging several smaller ones, removes deleted/expired cells, and improves read performance.
+Explanation: Major compaction rewrites all HFiles for a region into a single HFile, physically removing deleted data and improving read efficiency.
+
+Q48. You need to scan a large HBase table but want to process rows in a specific range of row keys (e.g., row keys starting with 'user1000' to 'user2000'). Which scan parameter is most critical?
+a) `setCaching()`
+b) `setStartRow('user1000')` and `setStopRow('user2000')`
+c) `setBatch()`
+d) `setFilter()`
+
+Answer: b) `setStartRow('user1000')` and `setStopRow('user2000')`
+Explanation: Row key ranges in HBase are highly efficient. Using `StartRow` and `StopRow` allows the RegionServer to seek directly to the start key and scan sequentially to the stop key.
+
+Q49. Your HBase cluster is facing read hotspot issues because most reads target the latest row keys (which are monotonically increasing timestamps). Which row key design strategy would best mitigate this problem?
+a) Use longer row keys.
+b) Use random prefixed row keys (e.g., `MD5(userId)_timestamp` or `Salt:timestamp`) to distribute writes across regions.
+c) Increase the region server heap size.
+d) Use a single column family for all data.
+
+Answer: b) Use random prefixed row keys (e.g., `MD5(userId)_timestamp` or `Salt:timestamp`) to distribute writes across regions.
+Explanation: Monotonic row keys cause all writes to go to a single region. Salting or hashing the key spreads writes uniformly across the key space and all regions.
+
+Q50. As per the self-learning task, you need to use PySpark to ingest data into an HBase table. Which Spark connector approach is most typical for this?
+a) Directly using HBase Java API within Spark's `mapPartitions`.
+b) Using the `saveAsHadoopDataset` method with appropriate `TableOutputFormat` configuration.
+c) There is no way to write to HBase from Spark.
+d) Writing data to HDFS and using a separate HBase bulk load tool.
+
+Answer: b) Using the `saveAsHadoopDataset` method with appropriate `TableOutputFormat` configuration.
+Explanation: The `saveAsNewAPIHadoopDataset` using `TableOutputFormat` (or its older counterpart) is the standard way to write to HBase from Spark (Java/Scala/Python). It handles the HBase mutation objects (Put/Delete).
+
+
+
+ Sections 16-19: Hive (Q51-Q65)
+
+Q51. You are designing a Hive table for daily sales data. Queries always filter by `sale_date`. Which feature should you use to dramatically improve query performance on these date-based queries?
+a) Bucketing by `sale_date`
+b) Partitioning by `sale_date`
+c) Using a complex SerDe
+d) Storing as a Sequence File
+
+Answer: b) Partitioning by `sale_date`
+Explanation: Partitioning in Hive separates data into sub-directories (e.g., `/sales/sale_date=2025-01-01`). A `WHERE sale_date = '...'` query will only scan the relevant partition sub-directory, not the entire table.
+
+Q52. You create an EXTERNAL Hive table over log files stored in `/data/logs/`. You then run `DROP TABLE logs_external;`. What happens to the data in `/data/logs/`?
+a) The data is moved to the Hive warehouse directory.
+b) The data is completely deleted from HDFS.
+c) Only the table metadata is deleted from Hive; the underlying data in `/data/logs/` remains.
+d) An error occurs because you cannot drop external tables.
+
+Answer: c) Only the table metadata is deleted from Hive; the underlying data in `/data/logs/` remains.
+Explanation: This is the core difference between MANAGED and EXTERNAL tables. External tables drop only the schema, preserving the data for other applications.
+
+Q53. Your Hive query joining a large `orders` table (partitioned by `order_date`) with a small `customers` table is very slow. You want the join to happen on the map side (without a reducer). What hint can you give Hive?
+a) `/+ MAPJOIN(customers) /`
+b) `/+ STREAMTABLE(customers) /`
+c) `/+ REDUCEJOIN(orders) /`
+d) `/+ SORTMERGEJOIN(customers) /`
+
+Answer: a) `/+ MAPJOIN(customers) /`
+Explanation: A MapJoin (or Broadcast Join) loads the small table into the memory of each map task, then joins as it reads the large table, avoiding the expensive shuffle/reduce phase. It requires one side of the join to fit in memory.
+
+Q54. You are analyzing a web log table partitioned by `year`, `month`, `day`. Your query `SELECT COUNT() FROM logs WHERE year=2025 AND month=01;` still seems to scan the whole month instead of jumping to the day. What is the optimal structure for filtering down to a single day?
+a) Dynamic partitioning
+b) Bucketing on `year`, `month`, `day`
+c) Include the `day` partition in the WHERE clause: `WHERE year=2025 AND month=01 AND day=15`
+d) Use a subquery.
+
+Answer: c) Include the `day` partition in the WHERE clause: `WHERE year=2025 AND month=01 AND day=15`
+Explanation: Hive's partition pruning works best when you filter on all levels of the partition hierarchy. Filtering only on year and month will scan all days within that month.
+
+Q55. You have a Hive table with many small files. This is causing performance issues due to excessive metadata overhead in the NameNode and slow map task startup. Which HiveQL command can merge many small files into fewer, larger files?
+a) `ANALYZE TABLE`
+b) `MSCK REPAIR TABLE`
+c) `ALTER TABLE ... CONCATENATE`
+d) `SHOW PARTITIONS`
+
+Answer: c) `ALTER TABLE ... CONCATENATE`
+Explanation: For RCFile and ORC format tables, `ALTER TABLE ... CONCATENATE` merges small files. For other formats, you can use `INSERT OVERWRITE ... SELECT ...` to rewrite the table.
+
+Q56. As part of a self-learning task, you are creating a presentation on Lateral View. In which scenario is `LATERAL VIEW` with `explode()` most useful?
+a) Joining two large tables.
+b) Transforming a single row with an array/string column into multiple rows (one per array element).
+c) Filtering rows based on a complex condition.
+d) Updating existing data in a table.
+
+Answer: b) Transforming a single row with an array/string column into multiple rows (one per array element).
+Explanation: `LATERAL VIEW` is used in conjunction with user-defined table generating functions (UDTFs) like `explode()` to flatten complex nested data structures (arrays, maps) into multiple rows.
+
+Q57. The `EXPLAIN` command on your Hive query shows a "Stage-1: Map Reduce" with "Map Operator Tree: ..." and "Reduce Operator Tree: ...". What does this tell you?
+a) The query is invalid.
+b) Hive will execute the query using only local mode.
+c) Hive will translate this query into a MapReduce job with both map and reduce phases.
+d) The query will use Spark as the execution engine.
+
+Answer: c) Hive will translate this query into a MapReduce job with both map and reduce phases.
+Explanation: The `EXPLAIN` command shows the Hive query plan. The presence of both map and reduce trees indicates a multi-stage job requiring a full MapReduce shuffle.
+
+Q58. You are loading a CSV file using `LOAD DATA LOCAL INPATH '/home/user/data.csv' INTO TABLE raw_data;`. What is the key behavior of this command?
+a) It copies the file `/home/user/data.csv` into the Hive warehouse directory for the table.
+b) It moves the file from the local Linux filesystem to the Hive warehouse directory.
+c) It only adds metadata; the file stays in place.
+d) It deletes the original file after the load.
+
+Answer: a) It copies the file into Hive warehouse
+//Correct Concept:
+LOCAL INPATH → source is local filesystem
+Hive will COPY file into HDFS
+Original local file remains
+//Only HDFS INPATH (without LOCAL) may behave like move (depending on table type)
+
+Q59. You are reading a self-learning paper on SerDes. Which statement best describes the purpose of a SerDe (Serializer/Deserializer) in Hive?
+a) It is a security module for Hive.
+b) It tells Hive how to read and write data in a specific format (e.g., CSV, JSON, Regex).
+c) It manages Hive transactions.
+d) It compresses the output of a Hive query.
+
+Answer: b) It tells Hive how to read and write data in a specific format (e.g., CSV, JSON, Regex).
+Explanation: SerDe is the de-facto standard for Hive to interpret files. It serializes (writes) and deserializes (reads) data between the Hive internal row format and the bytes on HDFS.
+
+Q60. You want to create a table `users_bucketed` bucketed by `user_id` into 16 buckets. What configuration property must be set to enforce bucketing during `INSERT OVERWRITE ... SELECT ...` queries?
+a) `hive.exec.dynamic.partition = true`
+b) `hive.enforce.bucketing = true`
+c) `hive.auto.convert.join = true`
+d) `hive.exec.parallel = true`
+
+Answer: b) `hive.enforce.bucketing = true`
+Explanation: Setting `hive.enforce.bucketing=true` (or using `CLUSTER BY` in the SELECT) ensures that data inserted into a bucketed table is properly hashed and distributed into the correct bucket files.
+
+Q61. A self-learning task asks you to explore ORC file format. What is a primary advantage of ORC (Optimized Row Columnar) over a text file?
+a) It stores data in plain text, making it human-readable.
+b) It supports ACID transactions and provides high compression with predicate pushdown.
+c) It is the only format supported by Hive.
+d) It is faster for writing data than for reading data.
+
+Answer: b) It supports ACID transactions and provides high compression with predicate pushdown.
+Explanation: ORC is a highly optimized, columnar storage format. It features built-in compression, indexes (min/max values per stripe), and predicate pushdown, which significantly speeds up queries.
+
+Q62. Your Hive query `SELECT city, COUNT() FROM users GROUP BY city` runs 10 mappers and 1 reducer. The reducer is a bottleneck. How can you improve parallelism on the aggregation?
+a) Increase the number of reducers for this job (e.g., `set mapreduce.job.reduces=10;`).
+b) Use a map-only join.
+c) Add an `ORDER BY` clause.
+d) Use a different file format.
+
+Answer: a) Increase the number of reducers for this job (e.g., `set mapreduce.job.reduces=10;`).
+Explanation: The `GROUP BY` aggregation is a shuffle operation. By default, it may use only 1 reducer. Increasing the number of reducers can parallelize the final aggregation step.
+
+Q63. You need to run a Hive script `hive_script.hql` with a parameter for the date. Which command correctly passes `'2025-01-15'` to a variable named `${hivevar:dt}` inside the script?
+a) `hive -f hive_script.hql -d dt=2025-01-15`
+b) `hive -e "set dt=2025-01-15; source hive_script.hql;"`
+c) `hive -i hive_script.hql dt=2025-01-15`
+d) `hive --define dt=2025-01-15 -f hive_script.hql`
+
+Answer: d) `hive --define dt=2025-01-15 -f hive_script.hql`
+Explanation: Hive variables are defined with `--define key=value` (or `-d`) and referenced as `${hivevar:key}` inside the script.
+
+Q64. Your Hive job is failing due to an `OutOfMemoryError`. You suspect a UDF causing issues. Which setting controls the maximum memory for a Hive map or reduce task's child JVM process?
+a) `hive.exec.reducers.bytes.per.reducer`
+b) `mapreduce.map.memory.mb` or `mapreduce.reduce.memory.mb`
+c) `hive.auto.convert.join.noconditionaltask.size`
+d) `hive.exec.parallel.thread.number`
+
+Answer: b) `mapreduce.map.memory.mb` or `mapreduce.reduce.memory.mb`
+Explanation: These standard Hadoop MapReduce configuration parameters control the memory allocated to the YARN container that runs the Hive task's JVM.
+
+Q65. After adding a new partition to your external Hive table using HDFS commands (`hdfs dfs -mkdir ...`), the partition does not show up in `SHOW PARTITIONS table;`. Which command syncs the Hive Metastore with the actual HDFS directory structure?
+a) `ALTER TABLE table ADD PARTITION ...`
+b) `MSCK REPAIR TABLE table`
+c) `DESCRIBE FORMATTED table`
+d) `ANALYZE TABLE table COMPUTE STATISTICS`
+
+Answer: b) `MSCK REPAIR TABLE table`
+Explanation: `MSCK REPAIR TABLE` (Metastore Check) scans the table's location on HDFS and adds any new partitions that exist in HDFS but are missing from the Metastore. It removes partitions that no longer have data, too.
+
+
+
+ Sections 20-22: Data Warehousing, Lakes & Airflow (Q66-Q75)
+
+Q66. You are designing a data pipeline for real-time reporting. You need to enforce schema, support ACID, and handle upserts. Which storage layer is most appropriate for the "golden" reporting layer?
+a) Data Lake (raw Parquet on HDFS/S3)
+b) Data Warehouse (e.g., Hive ACID table, or traditional RDBMS)
+c) A simple key-value store
+d) Flat files in a data lake
+
+Answer: b) Data Warehouse (e.g., Hive ACID table, or traditional RDBMS)
+Explanation: Data Warehouses are optimized for structured data, schema enforcement, BI reporting, and ACID compliance. Data Lakes are for raw, varied data.
+
+Q67. You have raw log files in a data lake. You then process and write them to an aggregated table in a data warehouse. This process reads from the lake and writes to the warehouse. What is this type of pipeline called?
+a) ELT (Extract-Load-Transform)
+b) ETL (Extract-Transform-Load)
+c) Reverse ETL
+d) Lambda Architecture
+
+Answer: b) ETL (Extract-Transform-Load)
+Explanation: In ETL, you extract from source, transform (process/aggregate), and then load into the final target (warehouse). In ELT, you load raw data into the lake first, then transform it in-place.
+
+Q68. Your Airflow DAG has a task `t1` that runs at 9:00 AM and a task `t2` that should run only if `t1` succeeds. How do you define this dependency?
+a) `t1.set_downstream(t2)`
+b) `t2.set_upstream(t1)`
+c) Both A and B are valid ways to set the same dependency (`t2` depends on `t1`).
+d) Dependencies are not possible in Airflow.
+
+Answer: c) Both A and B are valid ways to set the same dependency (`t2` depends on `t1`).
+Explanation: `t1 >> t2` is the modern syntax, but both `t1.set_downstream(t2)` and `t2.set_upstream(t1)` correctly define the dependency.
+
+Q69. You are creating an Airflow DAG to run a Spark job. Which operator is most suitable for submitting a Spark application to YARN or Kubernetes?
+a) `PythonOperator`
+b) `BashOperator`
+c) `SparkSubmitOperator`
+d) `SimpleHttpOperator`
+
+Answer: c) `SparkSubmitOperator`
+Explanation: `SparkSubmitOperator` is a specific Airflow operator designed to handle `spark-submit` commands, managing parameters, configurations, and monitoring the application's lifecycle.
+
+Q70. A self-learning task asks you to explore watermarking. In a stream processing context, what problem does watermarking solve?
+a) It encrypts the data stream.
+b) It increases the speed of the stream.
+c) It handles late-arriving data by allowing the system to wait a specified amount of time before closing a window for aggregation.
+d) It converts a batch pipeline to a streaming pipeline.
+
+Answer: c) It handles late-arriving data by allowing the system to wait a specified amount of time before closing a window for aggregation.
+Explanation: Watermarking is a crucial concept for handling out-of-order or late events in event-time-based stream processing (e.g., Spark Streaming, Flink).
+
+Q71. Your ETL pipeline using Informatica or Airflow frequently fails because a source file is sometimes empty. What is a best practice to add to your pipeline to handle this?
+a) Ignore the failure and proceed.
+b) Add a validation task before processing that checks file size and branches the DAG (e.g., skip processing if file is empty).
+c) Automatically delete the empty file.
+d) Increase the task retry count to infinity.
+
+Answer: b) Add a validation task before processing that checks file size and branches the DAG (e.g., skip processing if file is empty).
+Explanation: A resilient pipeline anticipates bad data. A `BranchPythonOperator` in Airflow or a decision task in Informatica can check conditions (like file size) and route the workflow accordingly.
+
+Q72. You are comparing ETL (Extract-Transform-Load) and ELT (Extract-Load-Transform). When is ELT typically a better choice?
+a) When the target system has weak processing capabilities.
+b) When you want to transform data after loading it into the data lake/warehouse, leveraging its processing power (e.g., BigQuery, Snowflake, Spark SQL on Data Lake).
+c) When you need low latency for the final reporting.
+d) When you are dealing with highly structured, low-volume data.
+
+Answer: b) When you want to transform data after loading it into the data lake/warehouse, leveraging its processing power (e.g., BigQuery, Snowflake, Spark SQL on Data Lake).
+Explanation: ELT loads raw data quickly, then uses the powerful compute engine of the target platform to perform transformations. This is common in modern cloud data platforms.
+
+Q73. Your Airflow DAG has 5 sequential tasks. You want task 4 to have a time-out of 2 hours. Which parameter is correct for the task definition?
+a) `timeout=timedelta(hours=2)`
+b) `execution_timeout=timedelta(hours=2)`
+c) `retry_delay=2`
+d) `max_runtime=7200`
+
+Answer: b) `execution_timeout=timedelta(hours=2)`
+Explanation: `execution_timeout` in Airflow defines the maximum time a task is allowed to run. If it exceeds this, the task will be marked as failed.
+
+Q74. You design a data lake delta layer. You receive files in CSV, JSON, and Avro formats. What is a core principle of a data lake?
+a) Enforcing a strict schema at ingestion.
+b) Storing data as-is (raw), in its native or near-native format, embracing schema-on-read.
+c) Using only a single file format.
+d) Deleting data immediately after processing.
+
+Answer: b) Storing data as-is (raw), in its native or near-native format, embracing schema-on-read.
+Explanation: Data lakes are built on the principle of storing raw, granular data regardless of structure. Schema is applied at read time by the consuming application.
+
+Q75. Your scheduled Airflow DAG for 2:00 AM failed because the previous day's DAG (which it depends on) was manually cleared and rerun, finishing at 3:30 AM. Which Airflow feature allows the 2:00 AM DAG to run automatically after its upstream dependency succeeds, even if its scheduled time has passed?
+a) `catchup=False`
+b) `depends_on_past=True`
+c) `trigger_rule='all_done'` and a scheduler that checks for missed runs.
+d) You must manually trigger the downstream DAG.
+
+Answer: b) depends_on_past=True (closer but still partial)
+//Real Concept:
+What actually controls this: depends_on_past,catchup=True,Scheduler backfill behavior. Best Explanation: Airflow: Tracks DAG runs
+Handles missed runs via catchup/backfill
+trigger_rule does NOT control scheduling timing
+
+
+ Sections 23-29: Apache Spark (Core, SQL, Streaming) (Q76-Q90)
+
+Q76. You are processing a 1TB dataset. You need low-latency iterative algorithms and in-memory caching across multiple stages. MapReduce is too slow. Which technology from the syllabus is best suited?
+a) HBase
+b) Apache Spark (with RDDs/DataFrames)
+c) Hive
+d) Pig
+
+Answer: b) Apache Spark (with RDDs/DataFrames)
+Explanation: Spark's primary advantage for many use cases (especially iterative ones) is in-memory computation, which avoids writing intermediate results to disk as MapReduce does.
+
+Q77. In PySpark, you create two DataFrames: `orders` and `customers`. Which operation triggers a wide transformation (requiring shuffle across partitions)?
+a) `orders.filter(orders.amount > 100)`
+b) `orders.select("order_id", "customer_id")`
+c) `orders.join(customers, "customer_id")`
+d) `orders.count()`
+
+Answer: c) `orders.join(customers, "customer_id")`
+Explanation: A join typically needs to bring together records with the same key from both DataFrames. This requires a shuffle, which is a wide transformation. `filter`, `select`, and `count` (which just materializes) are narrow or not shuffles.
+
+Q78. You are writing a Spark Streaming application to read from a Kafka topic. You want exactly-once processing semantics. Which combination is fundamental?
+a) Spark's `textFileStream` API.
+b) Idempotent output operations and using Kafka's direct stream API with checkpointing of offsets.
+c) Using the receiver-based approach.
+d) Setting `spark.streaming.stopGracefullyOnShutdown=false`.
+
+Answer: b) Idempotent output operations and using Kafka's direct stream API with checkpointing of offsets.
+Explanation: The direct (no-receiver) approach allows Spark to manage offsets itself. Combined with checkpoints and idempotent writes (or transactional output), you can achieve exactly-once semantics.
+
+Q79. You have a PySpark RDD of `(sale_date, amount)`. You want to sum the `amount` per `sale_date`. Which sequence of operations creates this aggregation and stores results?
+a) `rdd.reduceByKey(lambda x,y: x+y).collect()`
+b) `rdd.mapValues(lambda x: x).aggregate()`
+c) `rdd.flatMapValues(lambda x: x).reduce()`
+d) `rdd.sortByKey().saveAsTextFile()`
+
+Answer: a) `rdd.reduceByKey(lambda x,y: x+y).collect()`
+Explanation: `reduceByKey` performs a per-key aggregation using the provided associative function. `collect()` brings the results to the driver (fine for small aggregated results).
+
+Q80. Your Spark job fails with `org.apache.spark.shuffle.MetadataFetchFailedException: Missing an output location for shuffle`. What is the most likely cluster-level issue?
+a) A mapper task's output file is lost because the node hosting it failed, and Spark's shuffle service couldn't retrieve it.
+b) The driver program ran out of memory.
+c) Two executors tried to write to the same HDFS location.
+d) The input file is corrupt.
+
+Answer: a) A mapper task's output file is lost because the node hosting it failed, and Spark's shuffle service couldn't retrieve it.
+Explanation: This error occurs during the shuffle read phase when a reducer cannot find the shuffle output blocks it expects from a mapper. This often points to a node failure or a misconfigured external shuffle service.
+
+Q81. You need to connect your Spark application to a MySQL database to read a large table. Which approach is most efficient and avoids full table scan if a filter is pushed down?
+a) Using `spark.read.format("jdbc").option("dbtable", "users").load().filter("user_id > 1000")`
+b) Using `spark.read.jdbc("jdbc:mysql://...", "users", ["user_id > 1000"], ...)`
+c) Reading the entire table into a DataFrame and then using `filter`.
+d) Using a custom MapReduce connector.
+
+Answer: b) Using `spark.read.jdbc("jdbc:mysql://...", "users", ["user_id > 1000"], ...)`
+Explanation: The `predicates` parameter (or specifying a query with a `WHERE` clause in `dbtable`) enables predicate pushdown. Spark will push the filter to the JDBC source, reading only relevant rows.
+
+Q82. You are analyzing a DataFramedf. You run `df.createOrReplaceTempView("temp_view")`. What is the scope of `temp_view`?
+a) Only accessible within the current SparkSession.
+b) Accessible across all SparkSessions in the same application.
+c) Persistent in the Hive Metastore.
+d) Global to all Spark applications on the cluster.
+
+Answer: a) Only accessible within the current SparkSession.
+Explanation: `createOrReplaceTempView` creates a session-scoped temporary view. It disappears when the session ends. `createOrReplaceGlobalTempView` creates a global temp view.
+
+Q83. As per the Self Learning task, you need to save a DataFrame to a Hive table using `saveAsTable`. What must be true for this to succeed without extra configuration?
+a) The SparkSession must have `.enableHiveSupport()` when built.
+b) The data must be in Parquet format.
+c) You must call `repartition(1)` first.
+d) The Hive table must be external.
+
+Answer: a) The SparkSession must have `.enableHiveSupport()` when built.
+Explanation: To interact with Hive tables (reading/writing using Hive SerDes and the Metastore), you must build your SparkSession with `.enableHiveSupport()`. Otherwise, Spark uses its own in-memory catalog for temporary views.
+
+Q84. You want to find the total and average sales per product category using Spark SQL. Which functions are mentioned in the syllabus for such analytical operations?
+a) Map and Reduce functions only.
+b) DataFrame operations or Spark SQL aggregation functions (`GROUP BY`, `avg`, `sum`).
+c) RDD `foreach` loops.
+d) HBase in-memory counters.
+
+Answer: b) DataFrame operations or Spark SQL aggregation functions (`GROUP BY`, `avg`, `sum`).
+Explanation: The syllabus covers "Dataframe operations" and "SparkSQL" specifically for large-scale data analysis, which include built-in aggregation functions.
+
+Q85. Your Spark Streaming job processes data in 5-second micro-batches. A sudden spike in incoming data causes processing time to exceed 5 seconds. What happens according to Spark's default behavior?
+a) The stream crashes immediately.
+b) The processing next batch is triggered on schedule leading to an ever-growing backlog.
+c) Spark will dynamically adjust the batch interval upwards.
+d) The data is lost.
+
+Answer: b) The processing next batch is triggered on schedule leading to an ever-growing backlog.
+Explanation: By default, Spark Streaming's scheduler will submit the next batch based on the schedule (e.g., every 5 seconds), not based on when the previous batch finished. If processing takes 7 seconds, the next batch's data is waiting, and the queue grows.
+
+Q86. You are tasked with building a real-time dashboard showing counts of error events per minute from a Kafka stream. The source timestamps might be slightly out of order. According to the self-learning task on watermarking, what is the key requirement?
+a) Use `mapWithState`.
+b) Use a windowed aggregation on event time with a watermark to specify the maximum late data allowance.
+c) Disable checkpointing for faster processing.
+d) Use a global window.
+
+Answer: b) Use a windowed aggregation on event time with a watermark to specify the maximum late data allowance.
+Explanation: Structured Streaming provides watermarking to handle late data. You define a window (e.g., 1 minute) and a watermark (e.g., 10 seconds) to tell the engine how to handle straggling events.
+
+Q87. You are comparing RDDs, DataFrames, and Datasets in Spark. What is a key advantage of DataFrames/Datasets over RDDs for most analytical jobs?
+a) More verbose code.
+b) They always perform worse than RDDs.
+c) Catalyst optimizer and Tungsten engine provide significant performance gains through code generation and optimizations.
+d) They cannot handle structured data.
+
+Answer: c) Catalyst optimizer and Tungsten engine provide significant performance gains through code generation and optimizations.
+Explanation: DataFrames and Datasets leverage Spark's Catalyst optimizer and Tungsten execution engine for huge performance boosts over unoptimized RDD operations.
+
+Q88. You are analyzing election data using Spark. You need to rank candidates within each state by vote count. Which function is explicitly mentioned in the self-learning tasks for such windowing operations?
+a) `groupBy` and `collect_list`
+b) `row_number()` window function
+c) `mapPartitions`
+d) `coalesce`
+
+Answer: b) `row_number()` window function
+Explanation: The self-learning task mentions "Explore... Window functions". `row_number()` is a classic window function used for ranking within partitions.
+
+Q89. You need to run a deep learning model on a large dataset. The syllabus points you to which Spark component?
+a) Spark Streaming
+b) Spark MLlib
+c) Spark GraphX
+d) Spark RDD
+
+Answer: b) Spark MLlib
+Explanation: The session on "Spark MLlib" explicitly includes "Predictive Analysis" and "Deep Learning with Spark".
+
+Q90. Your PySpark code uses a UDF to calculate a complex value for each row. Performance is very poor. What is the most common reason for PySpark UDFs being slow?
+a) They run in Java, which is slow.
+b) They cause data to be serialized from JVM to Python process for each row, then back.
+c) They cannot be used with DataFrames.
+d) They automatically cause repartitioning.
+
+Answer: b) They cause data to be serialized from JVM to Python process for each row, then back.
+Explanation: PySpark UDFs (especially non-vectorized) incur heavy serialization between the JVM and Python executor processes. Prefer Pandas UDFs (vectorized) or built-in Spark SQL functions for performance.
+
+
+
+ Sections 30-33: Kafka, MLlib & Capstone (Q91-Q100)
+
+Q91. You are setting up a Kafka producer to send log events to a topic named `app-logs`. You want the producer to acknowledge that data is written only after the leader replica confirms receiving it. Which `acks` setting achieves this (default, good balance)?
+a) `acks=0`
+b) `acks=1`
+c) `acks=all` or `acks=-1`
+d) `acks=leader_only`
+
+Answer: c) acks=all (-1). Why:
+acks=1 → only leader confirms
+acks=all → all replicas confirm (strong durability)
+Question says: “acknowledge after leader replica confirms”. Ambiguous wording, but safer answer: For reliability → acks=all
+
+Q92. A consumer group has 4 consumers subscribed to a Kafka topic with 12 partitions. How will the partitions be assigned?
+a) Each consumer gets 3 partitions, evenly distributed.
+b) The first consumer gets all 12.
+c) Partitions are randomly assigned and cannot be controlled.
+d) Only 4 partitions will be used; the rest are idle.
+
+Answer: a) Each consumer gets 3 partitions, evenly distributed.
+Explanation: Kafka's consumer group protocol evenly distributes partitions among consumers. 12 partitions / 4 consumers = 3 partitions per consumer.
+
+Q93. Your Spark Streaming job processes Kafka messages. The processing logic fails intermittently due to a bug. You fix the logic and restart the job. Using the Direct Stream approach, how will the job know where to resume processing?
+a) It will always start from the latest offset.
+b) It will start from the earliest offset by default.
+c) If you have enabled checkpointing, Spark will read the stored offsets and resume from the last committed batch.
+d) You must manually find and set the offset in Kafka.
+
+Answer: c) If you have enabled checkpointing, Spark will read the stored offsets and resume from the last committed batch.
+Explanation: Structured Streaming and DStream's Direct Stream rely on checkpointing to store progress (including Kafka offsets) to fault-tolerant storage (e.g., HDFS).
+
+Q94. You are writing a Python producer for Kafka. The self-learning task asks for this. Which library would you need to install and import?
+a) `hadoop-kafka`
+b) `confluent_kafka` or `kafka-python`
+c) `pyspark-kafka`
+d) `flask-kafka`
+
+Answer: b) `confluent_kafka` or `kafka-python`
+Explanation: These are the standard Python client libraries for interacting with Kafka producers and consumers.
+
+Q95. Your capstone project requires a complex workflow: Bash operator to copy data, then Python operator to ingest to HDFS, then Spark operator for word count. Which technology from the syllabus orchestrates all these steps?
+a) MapReduce
+b) Apache Airflow / Informatica
+c) HBase Coprocessors
+d) Hive TRANSFORM clause
+
+Answer: b) Apache Airflow / Informatica
+Explanation: The final sessions on Airflow/Informatica and the Capstone Project specifically mention "Create a complex workflow using bash operator... python airflow operator to read data... ingest into HDFS... perform a spark WC".
+
+Q96. You are using `pyspark.ml` to train a linear regression model. According to the syllabus, this falls under which module?
+a) Spark Core
+b) Spark Streaming
+c) Spark MLlib
+d) Spark GraphFrames
+
+Answer: c) Spark MLlib
+Explanation: The syllabus explicitly lists "SparkMLlib" and "Predictive Analysis" in the same session.
+
+Q97. You are building a data pipeline and need to decide between using a Data Warehouse and a Data Lake. You need to run complex, ad-hoc analytical queries that sometimes fail and require re-processing of raw data. Which architecture is best?
+a) Data Warehouse only.
+b) Data Lake only (raw data + processing engine like Spark).
+c) Lambda architecture (using both for different purposes).
+d) Cache all data in Redis.
+
+Answer: c) Lambda architecture (using both for different purposes).
+Explanation: A typical modern pattern is to have a data lake for raw, reliable, immutable storage and a data warehouse for highly structured, curated, and performant BI layers.
+
+Q98. Your self-learning task is to automate a daily `spark-submit` job at 10 AM using a shell script and cron. The script fails with "spark-submit: command not found" even though you can run it from your terminal. What is the fix inside your script?
+a) Use `sudo spark-submit`.
+b) Source the user's profile (e.g., `source /home/user/.bashrc`) or set `export PATH=$PATH:/path/to/spark/bin` before calling `spark-submit`.
+c) Install Spark again.
+d) Use `./spark-submit` instead.
+
+Answer: b) Source the user's profile (e.g., `source /home/user/.bashrc`) or set `export PATH=$PATH:/path/to/spark/bin` before calling `spark-submit`.
+Explanation: As with Hadoop, the cron environment lacks the PATH. You must explicitly set environment variables or source the user's rc file within the script.
+
+Q99. You need to debug a slow join in a Spark DataFrame. You run `df.explain(true)` and see `SortMergeJoin`. What does the "SortMerge" part of the join strategy imply?
+a) The join is done entirely in memory without shuffling.
+b) Both sides of the join are shuffled so that identical keys are together, then sorted, and then merged.
+c) The smaller DataFrame is broadcasted.
+d) The join is performed using a lookup to an external index.
+
+Answer: b) Both sides of the join are shuffled so that identical keys are together, then sorted, and then merged.
+Explanation: A SortMergeJoin is the default join strategy for large datasets. It involves shuffling both sides by the join key, sorting each partition, and then merging the sorted lists.
+
+Q100. You are a junior Hadoop engineer. Your team lead asks you to write a Python script to consume messages from a Kafka topic and print them. According to the self-learning task, what should your script do?
+a) Use PySpark Streaming.
+b) Use the Kafka Consumer API (e.g., `kafka-python`), subscribe to the topic, and poll for messages in a loop.
+c) Use `hdfs dfs -cat` on a Kafka log directory.
+d) Use MapReduce to read Kafka.
+
+Answer: b) Use the Kafka Consumer API (e.g., `kafka-python`), subscribe to the topic, and poll for messages in a loop.
+Explanation: The self-learning task explicitly says: "Write a Python/Java consumer to consume messages from kafka topic". A standalone consumer script is the direct way to achieve this, as a foundation for understanding.

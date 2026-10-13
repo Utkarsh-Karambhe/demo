@@ -1,0 +1,1376 @@
+//Use Case 2: Telecom — Network Error Analysis
+
+ 1. Objective
+
+A telecom company wants to analyze network logs and find how many times each error code occurred.
+
+// Sample data
+
+
+CELL01,2026-09-20,ERROR_500
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+
+
+Expected:
+
+
+ERROR_404    2
+ERROR_500    3
+ERROR_503    2
+
+
+---
+
+# PART 1 — Verify  and Hadoop
+
+Because your Banking MapReduce job already worked, these checks should normally already be correct. Still, keep them in the lab document.
+
+// Step 1 — Check 
+
+
+ -version
+
+
+Expected:
+
+
+openjdk version "1.8.0_472"
+
+
+Check compiler:
+
+
+c -version
+
+
+Expected:
+
+
+c 1.8.0_472
+
+
+Check  location:
+
+
+which 
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64/bin/
+
+
+Check `c`:
+
+
+which c
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64/bin/c
+
+
+Check  home:
+
+
+echo $_HOME
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64
+
+
+---
+
+// Step 2 — Check Hadoop
+
+
+hadoop version
+
+
+Expected:
+
+
+Hadoop 3.3.6
+
+
+---
+
+# PART 2 — Start Hadoop Services
+
+Since your Hadoop installation is already configured, start the services.
+
+// Step 3 — Start SSH
+
+
+sudo service ssh start
+
+
+Expected:
+
+
+Starting OpenBSD Secure Shell server sshd
+
+
+If you see:
+
+
+ssh is already running
+
+
+that is also fine.
+
+Check:
+
+
+sudo service ssh status
+
+
+Expected:
+
+
+Active: active (running)
+
+
+---
+
+# PART 3 — Start HDFS
+
+// Step 4
+
+
+start-dfs.sh
+
+
+Expected:
+
+
+Starting namenodes on [localhost]
+Starting datanodes
+Starting secondary namenodes [localhost]
+
+
+Check:
+
+
+jps
+
+
+Expected:
+
+
+NameNode
+DataNode
+SecondaryNameNode
+
+
+---
+
+# PART 4 — Start YARN
+
+// Step 5
+
+
+start-yarn.sh
+
+
+Expected:
+
+
+Starting resourcemanager
+Starting nodemanagers
+
+
+Check:
+
+
+jps
+
+
+Expected:
+
+
+NameNode
+DataNode
+SecondaryNameNode
+ResourceManager
+NodeManager
+
+
+The order can be different.
+
+---
+
+# PART 5 — Create Telecom Project
+
+We will create a completely separate project:
+
+
+~/telecom-mapreduce
+
+
+// Step 6 — Create directories
+
+
+mkdir -p ~/telecom-mapreduce/src/com/company/telecom
+mkdir -p ~/telecom-mapreduce/classes
+cd ~/telecom-mapreduce
+
+
+Check:
+
+
+pwd
+
+
+Expected:
+
+
+/home/sari/telecom-mapreduce
+
+
+Check the directory structure:
+
+
+find .
+
+
+Expected:
+
+
+.
+./src
+./src/com
+./src/com/company
+./src/com/company/telecom
+./classes
+
+
+---
+
+# PART 6 — Create Network Log Input
+
+// Step 7 — Create input file
+
+
+cd ~/telecom-mapreduce
+nano network_logs.csv
+
+
+Enter exactly:
+
+
+CELL01,2026-09-20,ERROR_500
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+
+
+Save:
+
+
+Ctrl + O
+Enter
+
+
+Exit:
+
+
+Ctrl + X
+
+
+---
+
+# PART 7 — Verify Input Data
+
+// Step 8 — Display data
+
+
+cat network_logs.csv
+
+
+Expected:
+
+
+CELL01,2026-09-20,ERROR_500
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+
+
+---
+
+// Step 9 — Count records
+
+
+wc -l network_logs.csv
+
+
+Expected:
+
+
+7 network_logs.csv
+
+
+There are 7 network log records.
+
+---
+
+# PART 8 — Create Mapper
+
+The Mapper will read:
+
+
+CELL01,2026-09-20,ERROR_500
+
+
+and extract:
+
+
+ERROR_500
+
+
+Then it emits:
+
+
+ERROR_500    1
+
+
+---
+
+// Step 10 — Create Mapper  file
+
+
+nano src/com/company/telecom/NetworkErrorMapper.
+
+
+Enter:
+
+
+package com.company.telecom;
+
+import .io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class NetworkErrorMapper
+        extends Mapper<Object, , , IntWritable> {
+
+    private final static IntWritable one = new IntWritable(1);
+    private  errorCode = new ();
+
+    @Override
+    public void map(Object key,  value, Con con)
+            throws IOException, InterruptedException {
+
+        String[] fields = value.toString().split(",");
+
+        if (fields.length == 3) {
+
+            String error = fields[2].trim();
+
+            errorCode.set(error);
+
+            con.write(errorCode, one);
+        }
+    }
+}
+
+
+Save:
+
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+---
+
+# PART 9 — Understand Mapper
+
+Input:
+
+
+CELL01,2026-09-20,ERROR_500
+
+
+The Mapper splits the record:
+
+
+CELL01
+2026-09-20
+ERROR_500
+
+
+It selects field 3:
+
+
+ERROR_500
+
+
+and emits:
+
+
+ERROR_500    1
+
+
+For all records:
+
+
+ERROR_500    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+
+
+---
+
+# PART 10 — Create Reducer
+
+// Step 11 — Create Reducer
+
+
+nano src/com/company/telecom/NetworkErrorReducer.
+
+
+Enter:
+
+
+package com.company.telecom;
+
+import .io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.;
+import org.apache.hadoop.mapreduce.Reducer;
+
+public class NetworkErrorReducer
+        extends Reducer<, IntWritable, , IntWritable> {
+
+    private IntWritable result = new IntWritable();
+
+    @Override
+    public void reduce( key, Iterable<IntWritable> values,
+                       Con con)
+            throws IOException, InterruptedException {
+
+        int sum = 0;
+
+        for (IntWritable value : values) {
+            sum += value.get();
+        }
+
+        result.set(sum);
+
+        con.write(key, result);
+    }
+}
+
+
+Save:
+
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+---
+
+# PART 11 — Understand Shuffle and Sort
+
+Mapper produces:
+
+
+ERROR_500    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+
+
+Hadoop's Shuffle and Sort stage groups identical keys:
+
+
+ERROR_404 → [1,1]
+ERROR_500 → [1,1,1]
+ERROR_503 → [1,1]
+
+
+The Reducer receives these grouped values.
+
+---
+
+# PART 12 — Create Driver
+
+The Driver configures the MapReduce job.
+
+It tells Hadoop:
+
+* Mapper class
+* Reducer class
+* Input location
+* Output location
+* Mapper output key/value types
+* Reducer output key/value types
+
+// Step 12 — Create Driver
+
+
+nano src/com/company/telecom/TelecomErrorDriver.
+
+
+Enter:
+
+
+package com.company.telecom;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class TelecomErrorDriver {
+
+    public static void main(String[] args) throws Exception {
+
+        if (args.length != 2) {
+            System.err.println(
+                "Usage: TelecomErrorDriver <input> <output>"
+            );
+            System.exit(2);
+        }
+
+        Configuration conf = new Configuration();
+
+        Job job = Job.getInstance(conf,
+                "Telecom Network Error Analysis");
+
+        job.setJarByClass(TelecomErrorDriver.class);
+
+        job.setMapperClass(NetworkErrorMapper.class);
+        job.setReducerClass(NetworkErrorReducer.class);
+
+        job.setMapOutputKeyClass(.class);
+        job.setMapOutputValueClass(IntWritable.class);
+
+        job.setOutputKeyClass(.class);
+        job.setOutputValueClass(IntWritable.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}
+
+
+Save:
+
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+---
+
+# PART 13 — Verify  Files
+
+// Step 13
+
+
+cd ~/telecom-mapreduce
+find src -type f
+
+
+Expected:
+
+
+src/com/company/telecom/NetworkErrorMapper.
+src/com/company/telecom/NetworkErrorReducer.
+src/com/company/telecom/TelecomErrorDriver.
+
+
+---
+
+# PART 14 — Compile  Code
+
+// Step 14 — Compile all  files
+
+
+cd ~/telecom-mapreduce
+
+mkdir -p classes
+
+c -classpath "$(hadoop classpath)" \
+-d classes \
+src/com/company/telecom/*.
+
+
+If successful:
+
+
+
+
+There should be no compilation error.
+
+---
+
+// Step 15 — Check `.class` files
+
+
+find classes -type f
+
+
+Expected:
+
+
+classes/com/company/telecom/NetworkErrorMapper.class
+classes/com/company/telecom/NetworkErrorReducer.class
+classes/com/company/telecom/TelecomErrorDriver.class
+
+
+---
+
+# PART 15 — Create JAR
+
+// Step 16
+
+
+cd ~/telecom-mapreduce
+
+jar -cvf telecom-mapreduce.jar -C classes .
+
+
+Expected output similar to:
+
+
+added manifest
+adding: com/
+adding: com/company/
+adding: com/company/telecom/
+adding: com/company/telecom/NetworkErrorMapper.class
+adding: com/company/telecom/NetworkErrorReducer.class
+adding: com/company/telecom/TelecomErrorDriver.class
+
+
+Check:
+
+
+ls -lh telecom-mapreduce.jar
+
+
+Expected:
+
+
+-rw-r--r-- 1 sari sari ... telecom-mapreduce.jar
+
+
+The exact file size can be different.
+
+---
+
+# PART 16 — Create HDFS Input Directory
+
+We will use a separate HDFS location from the Banking use case.
+
+
+/banking/transactions/input
+
+
+was used for Use Case 1.
+
+Now we use:
+
+
+/telecom/network-errors/input
+
+
+// Step 17
+
+
+hdfs dfs -mkdir -p /telecom/network-errors/input
+
+
+Check:
+
+
+hdfs dfs -ls /telecom/network-errors
+
+
+Expected:
+
+
+Found 1 items
+drwxr-xr-x   - sari supergroup ... /telecom/network-errors/input
+
+
+---
+
+# PART 17 — Upload Network Logs to HDFS
+
+// Step 18
+
+
+cd ~/telecom-mapreduce
+
+hdfs dfs -put -f network_logs.csv /telecom/network-errors/input/
+
+
+Check:
+
+
+hdfs dfs -ls /telecom/network-errors/input
+
+
+Expected:
+
+
+Found 1 items
+-rw-r--r--   1 sari supergroup ... /telecom/network-errors/input/network_logs.csv
+
+
+---
+
+# PART 18 — Verify Data in HDFS
+
+// Step 19
+
+
+hdfs dfs -cat /telecom/network-errors/input/network_logs.csv
+
+
+Expected:
+
+
+CELL01,2026-09-20,ERROR_500
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+
+
+This confirms that the telecom log file is stored in HDFS.
+
+---
+
+# PART 19 — Remove Previous Output
+
+Before running MapReduce, make sure the output directory does not already exist.
+
+// Step 20
+
+
+hdfs dfs -rm -r -f /telecom/network-errors/output
+
+
+Possible output:
+
+
+Deleted /telecom/network-errors/output
+
+
+If you get:
+
+
+/telecom/network-errors/output: No such file or directory
+
+
+that is also fine.
+
+---
+
+# PART 20 — Final  8 Verification
+
+Because your previous lab had -version issues, do this before running the MapReduce job.
+
+// Step 21
+
+
+which 
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64/bin/
+
+
+
+ -version
+
+
+Expected:
+
+
+openjdk version "1.8.0_472"
+
+
+
+which c
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64/bin/c
+
+
+
+c -version
+
+
+Expected:
+
+
+c 1.8.0_472
+
+
+
+echo $_HOME
+
+
+Expected:
+
+
+/usr/lib/jvm/-8-openjdk-amd64
+
+
+---
+
+# PART 21 — Verify Hadoop _HOME
+
+// Step 22
+
+
+grep -n "_HOME" /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+
+Expected to contain:
+
+
+export _HOME=/usr/lib/jvm/-8-openjdk-amd64
+
+
+If it is not present or points to another  version:
+
+
+nano /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+
+Make sure this line exists:
+
+
+export _HOME=/usr/lib/jvm/-8-openjdk-amd64
+
+
+Save:
+
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+---
+
+# PART 22 — Run MapReduce Job
+
+// Step 23 — Execute the job
+
+Use the command exactly like this:
+
+
+hadoop jar ~/telecom-mapreduce/telecom-mapreduce.jar \
+com.company.telecom.TelecomErrorDriver \
+/telecom/network-errors/input \
+/telecom/network-errors/output
+
+
+Important: There must not be a space after the `\`.
+
+Correct:
+
+
+hadoop jar ~/telecom-mapreduce/telecom-mapreduce.jar \
+com.company.telecom.TelecomErrorDriver \
+/telecom/network-errors/input \
+/telecom/network-errors/output
+
+
+Not:
+
+
+hadoop jar ... \ 
+
+
+The latter can cause a shell error.
+
+---
+
+# PART 23 — Expected MapReduce Execution
+
+You should see Hadoop job information similar to:
+
+
+INFO mapreduce.JobSubmitter: number of splits:1
+INFO mapreduce.Job: Running job
+INFO mapreduce.Job: map 0% reduce 0%
+INFO mapreduce.Job: map 100% reduce 0%
+INFO mapreduce.Job: map 100% reduce 100%
+INFO mapreduce.Job: Job job_XXXXXXXX completed successfully
+
+
+You may see many additional INFO messages.
+
+The exact job ID and timing will be different on your machine.
+
+The important message is:
+
+
+completed successfully
+
+
+---
+
+# PART 24 — Check MapReduce Output
+
+// Step 24
+
+
+hdfs dfs -ls /telecom/network-errors/output
+
+
+Expected:
+
+
+Found 2 items
+-rw-r--r--   1 sari supergroup ... /telecom/network-errors/output/_SUCCESS
+-rw-r--r--   1 sari supergroup ... /telecom/network-errors/output/part-r-00000
+
+
+There are two important files:
+
+// `_SUCCESS`
+
+Indicates the MapReduce job completed successfully.
+
+// `part-r-00000`
+
+Contains the Reducer's final output.
+
+---
+
+# PART 25 — Display Final Result
+
+// Step 25
+
+
+hdfs dfs -cat /telecom/network-errors/output/part-r-00000
+
+
+Expected:
+
+
+ERROR_404    2
+ERROR_500    3
+ERROR_503    2
+
+
+This is the final answer for the telecom use case.
+
+---
+
+# PART 26 — Verify the Complete Flow
+
+// Input
+
+
+CELL01,2026-09-20,ERROR_500
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+CELL02,2026-09-20,ERROR_404
+CELL01,2026-09-20,ERROR_500
+CELL03,2026-09-20,ERROR_503
+
+
+↓
+
+// Mapper
+
+Mapper extracts the third field:
+
+
+ERROR_500    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+ERROR_404    1
+ERROR_500    1
+ERROR_503    1
+
+
+↓
+
+// Shuffle and Sort
+
+Hadoop groups the keys:
+
+
+ERROR_404 → [1,1]
+ERROR_500 → [1,1,1]
+ERROR_503 → [1,1]
+
+
+↓
+
+// Reducer
+
+Reducer adds the values:
+
+
+ERROR_404 → 1 + 1     = 2
+ERROR_500 → 1 + 1 + 1 = 3
+ERROR_503 → 1 + 1     = 2
+
+
+↓
+
+// Final HDFS Output
+
+
+ERROR_404    2
+ERROR_500    3
+ERROR_503    2
+
+
+---
+
+# PART 27 — Complete Project Structure
+
+After completing the lab:
+
+
+~/telecom-mapreduce/
+│
+├── transactions?              # No — this is Telecom project
+│
+├── network_logs.csv
+│
+├── telecom-mapreduce.jar
+│
+├── classes/
+│   └── com/
+│       └── company/
+│           └── telecom/
+│               ├── NetworkErrorMapper.class
+│               ├── NetworkErrorReducer.class
+│               └── TelecomErrorDriver.class
+│
+└── src/
+    └── com/
+        └── company/
+            └── telecom/
+                ├── NetworkErrorMapper.
+                ├── NetworkErrorReducer.
+                └── TelecomErrorDriver.
+
+
+---
+
+# PART 28 — HDFS Structure
+
+Your HDFS structure will be:
+
+
+/
+├── banking/
+│   └── transactions/
+│       ├── input/
+│       │   └── transactions.csv
+│       └── output/
+│           ├── _SUCCESS
+│           └── part-r-00000
+│
+└── telecom/
+    └── network-errors/
+        ├── input/
+        │   └── network_logs.csv
+        │
+        └── output/
+            ├── _SUCCESS
+            └── part-r-00000
+
+
+This is useful because students can clearly see that different business use cases can have separate HDFS locations.
+
+---
+
+# PART 29 — Check HDFS Using Commands
+
+// Check Telecom directory
+
+
+hdfs dfs -ls /telecom
+
+
+Expected:
+
+
+Found 1 items
+drwxr-xr-x ... /telecom/network-errors
+
+
+// Check input and output
+
+
+hdfs dfs -ls /telecom/network-errors
+
+
+Expected:
+
+
+input
+output
+
+
+// Check input
+
+
+hdfs dfs -ls /telecom/network-errors/input
+
+
+// Check output
+
+
+hdfs dfs -ls /telecom/network-errors/output
+
+
+// Read input
+
+
+hdfs dfs -cat /telecom/network-errors/input/network_logs.csv
+
+
+// Read output
+
+
+hdfs dfs -cat /telecom/network-errors/output/part-r-00000
+
+
+---
+
+# PART 30 — HDFS Web Interface
+
+Open:
+
+
+http://localhost:9870
+
+
+Then:
+
+
+Utilities
+    ↓
+Browse the file system
+
+
+Navigate to:
+
+
+/telecom/network-errors/input
+
+
+You should find:
+
+
+network_logs.csv
+
+
+Navigate to:
+
+
+/telecom/network-errors/output
+
+
+You should find:
+
+
+_SUCCESS
+part-r-00000
+
+
+Open `part-r-00000`.
+
+Expected:
+
+
+ERROR_404    2
+ERROR_500    3
+ERROR_503    2
+
+
+---
+
+# PART 31 — Important Interview Explanation
+
+// Question: What does the Mapper do?
+
+Answer:
+
+The Mapper reads each network log record, extracts the error code, and emits the error code with a value of `1`.
+
+Example:
+
+
+CELL01,2026-09-20,ERROR_500
+
+
+becomes:
+
+
+ERROR_500    1
+
+
+---
+
+// Question: What does Shuffle and Sort do?
+
+Answer:
+
+Shuffle and Sort groups all values belonging to the same error code.
+
+
+ERROR_500 → [1,1,1]
+
+
+---
+
+// Question: What does the Reducer do?
+
+Answer:
+
+The Reducer adds the values for each error code.
+
+
+ERROR_500 → 1 + 1 + 1 = 3
+
+
+---
+
+// Question: Why does the Mapper emit `1`?
+
+Because every input record represents one occurrence of an error.
+
+Therefore:
+
+
+One error occurrence → 1
+
+
+Three occurrences:
+
+
+1 + 1 + 1 = 3
+
+
+---
+
+# PART 32 — Corporate Application
+
+A telecom company may generate millions of network events:
+
+
+CELL001,2026-09-24,ERROR_500
+CELL002,2026-09-24,ERROR_404
+CELL003,2026-09-24,ERROR_503
+...
+
+
+MapReduce can process these distributed logs and produce:
+
+
+ERROR_404    125430
+ERROR_500    384920
+ERROR_503    98450
+
+
+This information can support:
+
+* Telecom network monitoring
+* Application log analysis
+* Network failure analysis
+* Identification of frequently occurring errors
+* Incident analysis
+* Operations dashboards
+* Capacity and reliability analysis
+
+---
+
+# PART 33 — Banking vs Telecom
+
+This is a useful way to teach students that the MapReduce pattern stays the same while the business data changes.
+
+| Banking                   | Telecom                       |
+
+| Transaction record        | Network log                   |
+| `TXN001,ATM,5000`         | `CELL01,2026-09-20,ERROR_500` |
+| Extract `ATM`             | Extract `ERROR_500`           |
+| `ATM → 1`                 | `ERROR_500 → 1`               |
+| Group by transaction type | Group by error code           |
+| Count transactions        | Count errors                  |
+| `ATM → 3`                 | `ERROR_500 → 3`               |
+
+The key difference is simply:
+
+
+Banking:
+Mapper extracts field[1]
+
+Telecom:
+Mapper extracts field[2]
+
+
+The Reducer logic remains the same:
+
+
+int sum = 0;
+
+for (IntWritable value : values) {
+    sum += value.get();
+}
+
+
+> MapReduce is a reusable processing pattern. The business field used as the key changes according to the analytics requirement, while the Map → Shuffle → Reduce architecture remains the same.

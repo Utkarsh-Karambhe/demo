@@ -1,0 +1,159 @@
+# Use Case: Student Record Management
+
+## Step 1: Create Local Repository
+
+```cmd
+mkdir student_project
+cd student_project
+git init
+git branch -M main
+git status
+```
+
+## Step 2: Configure Git
+
+```cmd
+git config user.name "Sohel Nagori"
+git config user.email "sohel@example.com"
+git config --list
+```
+
+## Step 3: Create File and Add Data
+
+```cmd
+type nul > student.txt
+echo Student Name: Sohel Nagori > student.txt
+type student.txt
+git status
+```
+
+## Step 4: Stage and Commit
+
+```cmd
+git add student.txt
+git status
+git diff --cached
+git commit -m "Add student details"
+git log --oneline
+git show --stat
+```
+
+## Step 5: Modify File and Commit Again
+
+```cmd
+echo Course: CDAC BDA >> student.txt
+git status
+git diff
+git add student.txt
+git diff --cached
+git commit -m "Update student details"
+git log --oneline
+```
+
+## Step 6: Create and Switch Branch
+
+```cmd
+git branch
+git branch feature
+git switch feature
+```
+
+## Step 7: Create Feature File and Commit
+
+```cmd
+type nul > feature.txt
+echo Student project feature > feature.txt
+git status
+git add .
+git diff --cached
+git commit -m "Add feature file"
+git log --oneline
+```
+
+## Step 8: Merge Feature Branch into Main
+
+```cmd
+git switch main
+git merge feature
+git branch
+git status
+git log --oneline --graph --all
+```
+
+## Step 9: Delete Merged Branch
+
+```cmd
+git branch -d feature
+git branch
+```
+
+## Step 10: Practice Unstaging a File
+
+```cmd
+echo New student detail >> student.txt
+git add student.txt
+git status
+git restore --staged student.txt
+git status
+```
+
+## Step 11: Practice Discarding Unstaged Changes
+
+```cmd
+git diff
+git restore student.txt
+git status
+```
+
+## Step 12: Create and Switch Branch in One Command
+
+```cmd
+git switch -c feature/marks
+git branch
+```
+
+## Step 13: Create a Merge Conflict
+
+```cmd
+git switch main
+git switch -c feature/message-a
+```
+
+Open `student.txt` and add this line:
+
+```text
+Status: Passed
+```
+
+Save the file, then run:
+
+```cmd
+git add student.txt
+git commit -m "Add passed status"
+git switch main
+git switch -c feature/message-b
+```
+
+Open `student.txt` and add this different line:
+
+```text
+Status: Failed
+```
+
+Save the file, then run:
+
+```cmd
+git add student.txt
+git commit -m "Add failed status"
+git merge feature/message-a
+```
+
+Open `student.txt`, resolve the conflict manually, and remove all conflict markers. Save the file, then run:
+
+```cmd
+git status
+git add student.txt
+git commit -m "Resolve merge conflict"
+git log --oneline --graph --all
+git status
+```

@@ -1,0 +1,2309 @@
+
+
+ //ELT project for E-Commerce Order Analytics using HDFS + Hive + Sqoop + Airflow, including:
+
+ - Corporate-style input CSV
+- MySQL source data
+- HDFS raw layer
+- Sqoop import
+- Hive RAW external tables
+- Hive transformation layer
+- Parquet warehouse tables
+- Total revenue per customer
+- Daily sales trends
+- Top customers
+- Partitioning
+- Validation commands and expected output
+- Sqoop installation
+- Airflow installation
+- Airflow DAG for orchestration
+- Project folder structure
+- Interview explanation
+
+ One important current note: Apache Sqoop is retired by Apache, with 1.4.7 being its last stable release. It is still useful for demonstrating/learning a legacy Hadoop ELT stack, but I would explicitly mention this in an interview.  Apache Sqoop+1
+.
+---
+
+ 1. Project Overview
+
+ // Project Name
+
+ E-Commerce Order Analytics using Data Lake + Hive – ELT Pipeline
+
+ // Business Requirement
+
+ An e-commerce company wants to analyze customer orders and generate:
+
+ 1. Total revenue per customer
+2. Daily sales trends
+3. Top customers by revenue
+4. Number of orders per customer
+
+---
+
+ # 2. Architecture
+
+
+                    E-COMMERCE SOURCES
+                           |
+             +-------------+-------------+
+             |                           |
+        orders.csv                    MySQL
+             |                     customers table
+             |                           |
+             v                           v
+          HDFS RAW                  Sqoop Import
+             |                           |
+             +-------------+-------------+
+                           |
+                           v
+                  HDFS DATA LAKE
+                  /data/raw/...
+                           |
+                           v
+                 Hive External Tables
+                   orders_raw
+                   customers_raw
+                           |
+                           v
+                  HIVE TRANSFORMATION
+                           |
+             +-------------+-------------+
+             |             |             |
+             v             v             v
+       Customer       Daily Sales    Top Customer
+       Summary          Summary        Analysis
+             |             |             |
+             +-------------+-------------+
+                           |
+                           v
+                    PARQUET TABLES
+                    HIVE WAREHOUSE
+                           |
+                           v
+                      BI / Reports
+
+
+ This follows the ELT principle:
+``
+`
+Extract
+   ↓
+Load RAW data
+   ↓
+Transform inside Hive
+   ↓
+Store analytical data
+
+
+ Hive is designed for SQL-based data warehousing, summarization and analysis over data stored in Hadoop/HDFS.  Apache Hive+1
+
+---
+
+ # 3. Technology Stack
+
+ | Component | Technology |
+
+| Source 1 | CSV |
+| Source 2 | MySQL |
+| Data Lake | HDFS |
+| Bulk ingestion | Sqoop |
+| Transformation | Apache Hive |
+| Warehouse format | Parquet |
+| Orchestration | Apache Airflow |
+| Query | Hive SQL / Beeline |
+| OS | Linux/Ubuntu |
+| Language | SQL + Bash |
+
+---
+
+ # 4. Recommended Project Directory
+
+ On your Linux machine:
+
+
+mkdir -p ~/ecommerce-elt
+cd ~/ecommerce-elt
+
+mkdir -p input
+mkdir -p sql
+mkdir -p scripts
+mkdir -p airflow/dags
+mkdir -p logs
+
+
+ Final structure:
+
+
+ecommerce-elt/
+│
+├── input/
+│   └── orders.csv
+│
+├── sql/
+│   ├── 01_create_raw_tables.sql
+│   ├── 02_create_warehouse_tables.sql
+│   ├── 03_transform.sql
+│   └── 04_analytics.sql
+│
+├── scripts/
+│   ├── load_orders.sh
+│   └── sqoop_customers.sh
+│
+└── airflow/
+    └── dags/
+        └── ecommerce_elt_dag.py
+
+
+---
+
+ # 5. Prerequisites
+
+ For a local project, install/configure:
+
+
+Java
+Hadoop
+HDFS
+YARN
+Hive
+MySQL
+MySQL JDBC Connector
+Sqoop
+Python
+Airflow
+
+
+ For current Hive installations, Apache's documentation lists Java and Hadoop prerequisites and recommends HiveServer2/Beeline for modern usage.  Apache Hive+1
+
+---
+
+ # 6. Start Hadoop
+
+ Assuming Hadoop is already installed:
+
+
+start-dfs.sh
+start-yarn.sh
+
+
+ Verify:
+
+
+jps
+
+
+ Expected:
+
+
+NameNode
+DataNode
+ResourceManager
+NodeManager
+SecondaryNameNode
+
+
+ Check HDFS:
+
+
+hdfs dfs -ls /
+
+
+ Expected:
+
+
+drwxr-xr-x   - hadoop supergroup          0 /tmp
+drwxr-xr-x   - hadoop supergroup          0 /user
+
+
+---
+
+ # 7. Create Corporate-Style Orders CSV
+
+ This is the raw source file.
+
+ Create:
+
+
+cd ~/ecommerce-elt/input
+
+vi orders.csv
+
+
+ Use:
+
+
+order_id,customer_id,amount,order_date
+ORD10001,C001,1250.50,2026-01-05
+ORD10002,C002,899.00,2026-01-05
+ORD10003,C003,450.75,2026-01-06
+ORD10004,C001,2100.00,2026-01-06
+ORD10005,C004,3200.00,2026-01-07
+ORD10006,C002,1250.00,2026-01-07
+ORD10007,C005,750.25,2026-01-08
+ORD10008,C003,1800.00,2026-01-08
+ORD10009,C001,950.00,2026-01-09
+ORD10010,C004,4200.00,2026-01-09
+ORD10011,C002,650.50,2026-01-10
+ORD10012,C005,1450.00,2026-01-10
+ORD10013,C001,1750.75,2026-01-11
+ORD10014,C003,999.00,2026-01-11
+ORD10015,C004,2500.00,2026-01-12
+ORD10016,C005,1100.00,2026-01-12
+ORD10017,C002,2200.00,2026-01-13
+ORD10018,C001,850.00,2026-01-13
+ORD10019,C003,650.00,2026-01-14
+ORD10020,C004,1800.00,2026-01-14
+
+
+---
+
+ # 8. Validate the CSV
+
+
+head orders.csv
+
+
+ Expected:
+
+
+order_id,customer_id,amount,order_date
+ORD10001,C001,1250.50,2026-01-05
+ORD10002,C002,899.00,2026-01-05
+ORD10003,C003,450.75,2026-01-06
+...
+
+
+ Count rows:
+
+
+wc -l orders.csv
+
+
+ Expected:
+
+
+21 orders.csv
+
+
+ Because:
+
+
+1 header + 20 records = 21 lines
+
+
+---
+
+ # 9. MySQL Customer Source
+
+ Create the database:
+
+
+CREATE DATABASE ecommerce;
+USE ecommerce;
+
+
+ Create customers:
+
+
+CREATE TABLE customers (
+    customer_id VARCHAR(20),
+    name VARCHAR(100),
+    email VARCHAR(150)
+);
+
+
+ Insert corporate-style data:
+
+
+INSERT INTO customers VALUES
+('C001','John Carter','john.carter@acmecommerce.com'),
+('C002','Anita Sharma','anita.sharma@acmecommerce.com'),
+('C003','Ravi Kumar','ravi.kumar@acmecommerce.com'),
+('C004','Priya Nair','priya.nair@acmecommerce.com'),
+('C005','Michael Thomas','michael.thomas@acmecommerce.com');
+
+
+ Verify:
+
+
+SELECT * FROM customers;
+
+
+ Expected:
+
+
++-------------+---------------+-------------------------------+
+| customer_id | name          | email                         |
++-------------+---------------+-------------------------------+
+| C001        | John Carter   | john.carter@acmecommerce.com |
+| C002        | Anita Sharma  | anita.sharma@acmecommerce.com|
+| C003        | Ravi Kumar    | ravi.kumar@acmecommerce.com  |
+| C004        | Priya Nair   | priya.nair@acmecommerce.com  |
+| C005        | Michael Thomas| michael.thomas@acmecommerce.com|
++-------------+---------------+-------------------------------+
+
+
+---
+
+ # 10. MySQL JDBC Driver
+
+ Sqoop needs the MySQL JDBC connector.
+
+ Check:
+
+
+ls $SQOOP_HOME/lib | grep mysql
+
+
+ You should have something similar to:
+
+
+mysql-connector-j-8.x.x.jar
+
+
+ If it isn't present, download the MySQL Connector/J package from MySQL and copy the JAR into:
+
+
+$SQOOP_HOME/lib/
+
+
+ Then test:
+
+
+sqoop version
+
+
+---
+
+ # 11. Sqoop Installation
+
+ // Important
+
+ Sqoop is a legacy/retired Apache project. Apache's site identifies 1.4.7 as the latest stable Sqoop release and states that the project has retired.  Apache Sqoop
+
+ For a learning/project environment, you can still demonstrate it.
+
+ Download/extract the 1.4.7 binary:
+
+
+cd /opt
+
+
+ Then extract your downloaded Sqoop archive:
+
+
+sudo tar -xzf sqoop-1.4.7-bin-hadoop*.tar.gz
+
+
+ Rename:
+
+
+sudo mv sqoop-1.4.7-bin-hadoop* sqoop
+
+
+ Set environment variables:
+
+
+vi ~/.bashrc
+
+
+ Add:
+
+
+export SQOOP_HOME=/opt/sqoop
+export PATH=$PATH:$SQOOP_HOME/bin
+
+
+ Apply:
+
+
+source ~/.bashrc
+
+
+ Check:
+
+
+sqoop version
+
+
+ Expected:
+
+
+Sqoop 1.4.7
+
+
+---
+
+ # 12. Test Sqoop MySQL Connection
+
+ Run:
+
+
+sqoop list-databases 
+--connect jdbc:mysql://localhost:3306/ 
+--username root 
+--password welcome
+
+
+ Expected:
+
+
+information_schema
+ecommerce
+mysql
+performance_schema
+sys
+
+
+ Then:
+
+
+sqoop list-tables 
+--connect jdbc:mysql://localhost:3306/ecommerce 
+--username root 
+--password welcome
+
+
+ Expected:
+
+
+customers
+
+
+---
+
+ # 13. STEP 1 — LOAD Orders into HDFS RAW
+
+ Create the HDFS directory:
+
+
+hdfs dfs -mkdir -p /data/raw/orders
+
+
+ Upload:
+
+
+hdfs dfs -put ~/ecommerce-elt/input/orders.csv /data/raw/orders/
+
+
+ Verify:
+
+
+hdfs dfs -ls /data/raw/orders
+
+
+ Expected:
+
+
+/data/raw/orders/orders.csv
+
+
+ Check contents:
+
+
+hdfs dfs -cat /data/raw/orders/orders.csv | head
+
+
+ Expected:
+
+
+order_id,customer_id,amount,order_date
+ORD10001,C001,1250.50,2026-01-05
+ORD10002,C002,899.00,2026-01-05
+...
+
+
+ At this point:
+
+
+CSV
+ ↓
+HDFS
+ ↓
+RAW
+
+
+ No transformation has happened.
+
+---
+
+ # 14. STEP 2 — Import Customers Using Sqoop
+
+ Create HDFS target:
+
+
+hdfs dfs -mkdir -p /data/raw/customers
+
+
+ Use Sqoop:
+
+
+sqoop import 
+--connect jdbc:mysql://localhost:3306/ecommerce 
+--username root 
+--password welcome 
+--table customers 
+--target-dir /data/raw/customers 
+--fields-terminated-by ',' 
+--lines-terminated-by 'n' 
+--m 1
+
+
+ Expected Sqoop output will look approximately like:
+
+
+INFO sqoop.Sqoop: Running Sqoop version: 1.4.7
+INFO manager.MySQLManager: Preparing to connect to MySQL
+INFO mapreduce.ImportJobBase: Beginning import of customers
+INFO mapreduce.Job: map 100% reduce 0%
+INFO mapreduce.ImportJobBase: Transferred 350 bytes
+
+
+ Verify:
+
+
+hdfs dfs -ls /data/raw/customers
+
+
+ Expected:
+
+
+/data/raw/customers/part-m-00000
+
+
+ Check:
+
+
+hdfs dfs -cat /data/raw/customers/part-m-00000
+
+
+ Expected:
+
+
+C001,John Carter,john.carter@acmecommerce.com
+C002,Anita Sharma,anita.sharma@acmecommerce.com
+C003,Ravi Kumar,ravi.kumar@acmecommerce.com
+C004,Priya Nair,priya.nair@acmecommerce.com
+C005,Michael Thomas,michael.thomas@acmecommerce.com
+
+
+---
+
+ # 15. Why `--fields-terminated-by ','`?
+
+ This is important.
+
+ Sqoop's default output delimiter isn't necessarily the same delimiter used by our Hive external table.
+
+ We explicitly say:
+
+
+--fields-terminated-by ','
+
+
+ Therefore:
+
+
+C001,John Carter,john.carter@...
+
+
+ matches:
+
+
+FIELDS TERMINATED BY ','
+
+
+ in Hive.
+
+---
+
+ # 16. Final HDFS Raw Structure
+
+ Run:
+
+
+hdfs dfs -ls -R /data/raw
+
+
+ Expected:
+
+
+/data/raw/orders
+/data/raw/orders/orders.csv
+
+/data/raw/customers
+/data/raw/customers/part-m-00000
+
+
+ Architecture now:
+
+
+CSV ----------------------+
+                          |
+                          v
+                    HDFS /data/raw
+                          |
+MySQL → Sqoop ------------+
+
+
+---
+
+ # 17. STEP 3 — Start Hive
+
+ For a Hive installation, the warehouse and temporary HDFS directories need to exist and be writable. Apache's installation documentation specifically calls out `/tmp` and `/user/hive/warehouse`.  Apache Hive
+
+ Run:
+
+
+hdfs dfs -mkdir -p /tmp
+hdfs dfs -mkdir -p /user/hive/warehouse
+
+hdfs dfs -chmod g+w /tmp
+hdfs dfs -chmod g+w /user/hive/warehouse
+
+
+ If using HiveServer2:
+
+
+hiveserver2
+
+
+ Then another terminal:
+
+
+beeline -u jdbc:hive2://localhost:10000
+
+
+ Modern Hive documentation recommends Beeline/HiveServer2 rather than the older Hive CLI.  Apache Hive
+
+---
+
+ # 18. Create Hive Database
+
+
+CREATE DATABASE IF NOT EXISTS ecommerce_dw;
+
+
+ Use it:
+
+
+USE ecommerce_dw;
+
+
+ Verify:
+
+
+SHOW DATABASES;
+
+
+ Expected:
+
+
+default
+ecommerce_dw
+
+
+---
+
+ # 19. STEP 4 — Create RAW Orders External Table
+
+ Because the CSV contains a header, we should tell Hive to skip it.
+
+
+CREATE EXTERNAL TABLE orders_raw (
+    order_id STRING,
+    customer_id STRING,
+    amount STRING,
+    order_date STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/data/raw/orders'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+
+---
+
+ # 20. Create RAW Customers External Table
+
+
+CREATE EXTERNAL TABLE customers_raw (
+    customer_id STRING,
+    name STRING,
+    email STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/data/raw/customers';
+
+
+---
+
+ # 21. Check Tables
+
+
+SHOW TABLES;
+
+
+ Expected:
+
+
+customers_raw
+orders_raw
+
+
+---
+
+ # 22. Validate RAW Orders
+
+
+SELECT * FROM orders_raw LIMIT 10;
+
+
+ Expected:
+
+
+ORD10001 C001 1250.50 2026-01-05
+ORD10002 C002 899.00  2026-01-05
+ORD10003 C003 450.75  2026-01-06
+ORD10004 C001 2100.00 2026-01-06
+ORD10005 C004 3200.00 2026-01-07
+...
+
+
+ Notice:
+
+
+amount = STRING
+order_date = STRING
+
+
+ This is intentional.
+
+ Why?
+
+ Because RAW tables should preserve source data as closely as possible.
+
+---
+
+ # 23. Validate RAW Customers
+
+
+SELECT * FROM customers_raw;
+
+
+ Expected:
+
+
+C001  John Carter    john.carter@acmecommerce.com
+C002  Anita Sharma   anita.sharma@acmecommerce.com
+C003  Ravi Kumar     ravi.kumar@acmecommerce.com
+C004  Priya Nair     priya.nair@acmecommerce.com
+C005  Michael Thomas michael.thomas@acmecommerce.com
+
+
+---
+
+ # 24. Count Raw Orders
+
+
+SELECT COUNT(*) FROM orders_raw;
+
+
+ Expected:
+
+
+20
+
+
+ Customers:
+
+
+SELECT COUNT(*) FROM customers_raw;
+
+
+ Expected:
+
+
+5
+
+
+---
+
+ # 25. STEP 5 — Create TRANSFORMED Orders Table
+
+ Now the ELT part begins.
+
+ Instead of transforming before loading into HDFS:
+
+
+BAD representation for ELT:
+
+CSV
+ ↓
+Python cleaning
+ ↓
+HDFS
+
+
+ We are doing:
+
+
+CSV
+ ↓
+HDFS RAW
+ ↓
+Hive
+ ↓
+TRANSFORMATION
+
+
+ Create:
+
+
+CREATE TABLE orders_transformed (
+    order_id STRING,
+    customer_id STRING,
+    amount DOUBLE,
+    order_date DATE
+)
+STORED AS PARQUET;
+
+
+---
+
+ # 26. Transform RAW → Parquet
+
+
+INSERT OVERWRITE TABLE orders_transformed
+SELECT
+    order_id,
+    customer_id,
+    CAST(amount AS DOUBLE),
+    CAST(order_date AS DATE)
+FROM orders_raw
+WHERE order_id IS NOT NULL
+  AND customer_id IS NOT NULL
+  AND amount IS NOT NULL
+  AND order_date IS NOT NULL;
+
+
+ Now:
+
+
+orders_raw
+     |
+     | CAST
+     | validation
+     v
+orders_transformed
+     |
+     v
+Parquet
+
+
+---
+
+ # 27. Validate Transformed Table
+
+
+SELECT * FROM orders_transformed LIMIT 10;
+
+
+ Expected:
+
+
+ORD10001 C001 1250.50 2026-01-05
+ORD10002 C002 899.00  2026-01-05
+ORD10003 C003 450.75  2026-01-06
+...
+
+
+ Check schema:
+
+
+DESCRIBE orders_transformed;
+
+
+ Expected:
+
+
+order_id       string
+customer_id    string
+amount         double
+order_date     date
+
+
+---
+
+ # 28. STEP 6 — Customer Order Summary
+
+ Create warehouse table:
+
+
+CREATE TABLE customer_order_summary (
+    customer_id STRING,
+    name STRING,
+    total_spent DOUBLE,
+    total_orders INT
+)
+STORED AS PARQUET;
+
+
+ Transform:
+
+
+INSERT OVERWRITE TABLE customer_order_summary
+SELECT
+    c.customer_id,
+    c.name,
+    SUM(o.amount) AS total_spent,
+    COUNT(o.order_id) AS total_orders
+FROM orders_transformed o
+JOIN customers_raw c
+    ON o.customer_id = c.customer_id
+GROUP BY
+    c.customer_id,
+    c.name;
+
+
+---
+
+ # 29. Query Customer Summary
+
+
+SELECT
+    customer_id,
+    name,
+    ROUND(total_spent, 2) AS total_spent,
+    total_orders
+FROM customer_order_summary
+ORDER BY total_spent DESC;
+
+
+ Based on the sample input, expected output is approximately:
+
+
+C004  Priya Nair     11700.00   4
+C001  John Carter     6901.25   5
+C002  Anita Sharma    4999.50   4
+C005  Michael Thomas  3300.25   3
+C003  Ravi Kumar      3899.75   4
+
+
+ The exact values can be independently verified from the sample rows.
+
+---
+
+ # 30. Requirement 1 — Total Revenue Per Customer
+
+ The important SQL is:
+
+
+SELECT
+    c.customer_id,
+    c.name,
+    SUM(o.amount) AS total_revenue
+FROM orders_transformed o
+JOIN customers_raw c
+    ON o.customer_id = c.customer_id
+GROUP BY
+    c.customer_id,
+    c.name
+ORDER BY total_revenue DESC;
+
+
+ Output:
+
+
+C004  Priya Nair      11700.00
+C001  John Carter      6901.25
+C002  Anita Sharma     4999.50
+C003  Ravi Kumar       3899.75
+C005  Michael Thomas   3300.25
+
+
+---
+
+ # 31. Requirement 2 — Daily Sales Trends
+
+ Create:
+
+
+CREATE TABLE daily_sales_summary (
+    order_date DATE,
+    total_sales DOUBLE,
+    total_orders INT
+)
+STORED AS PARQUET;
+
+
+ Load:
+
+
+INSERT OVERWRITE TABLE daily_sales_summary
+SELECT
+    order_date,
+    SUM(amount) AS total_sales,
+    COUNT(order_id) AS total_orders
+FROM orders_transformed
+GROUP BY order_date;
+
+
+ Query:
+
+
+SELECT
+    order_date,
+    ROUND(total_sales, 2) AS total_sales,
+    total_orders
+FROM daily_sales_summary
+ORDER BY order_date;
+
+
+ Expected:
+
+
+2026-01-05   2149.50   2
+2026-01-06   2550.75   2
+2026-01-07   4450.00   2
+2026-01-08   2550.25   2
+2026-01-09   5150.00   2
+2026-01-10   2100.50   2
+2026-01-11   2749.75   2
+2026-01-12   3600.00   2
+2026-01-13   3050.00   2
+2026-01-14   2450.00   2
+
+
+ This gives your business team a daily sales trend.
+
+---
+
+ # 32. Requirement 3 — Top Customers
+
+ For example, top 3:
+
+
+SELECT
+    customer_id,
+    name,
+    total_spent,
+    total_orders
+FROM customer_order_summary
+ORDER BY total_spent DESC
+LIMIT 3;
+
+
+ Expected:
+
+
+C004  Priya Nair     11700.00  4
+C001  John Carter     6901.25  5
+C002  Anita Sharma    4999.50  4
+
+
+ This is the analytical output.
+
+---
+
+ # 33. Better Top Customer Query Using RANK
+
+ For a corporate project, you can also demonstrate window functions:
+
+
+SELECT
+    customer_id,
+    name,
+    total_spent,
+    total_orders,
+    RANK() OVER (ORDER BY total_spent DESC) AS revenue_rank
+FROM customer_order_summary;
+
+
+ Expected:
+
+
+C004  Priya Nair      11700.00  4  1
+C001  John Carter      6901.25  5  2
+C002  Anita Sharma     4999.50  4  3
+C003  Ravi Kumar       3899.75  4  4
+C005  Michael Thomas   3300.25  3  5
+
+
+---
+
+ # 34. STEP 7 — Partitioned Table
+
+ For a larger enterprise dataset, partition by date.
+
+
+CREATE TABLE orders_partitioned (
+    order_id STRING,
+    customer_id STRING,
+    amount DOUBLE
+)
+PARTITIONED BY (order_date DATE)
+STORED AS PARQUET;
+
+
+ Load:
+
+
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=nonstrict;
+
+
+ Then:
+
+
+INSERT OVERWRITE TABLE orders_partitioned
+PARTITION (order_date)
+SELECT
+    order_id,
+    customer_id,
+    amount,
+    order_date
+FROM orders_transformed;
+
+
+ Check:
+
+
+SHOW PARTITIONS orders_partitioned;
+
+
+ Expected:
+
+
+order_date=2026-01-05
+order_date=2026-01-06
+order_date=2026-01-07
+order_date=2026-01-08
+order_date=2026-01-09
+order_date=2026-01-10
+order_date=2026-01-11
+order_date=2026-01-12
+order_date=2026-01-13
+order_date=2026-01-14
+
+
+---
+
+ # 35. Why Partitioning?
+
+ Suppose you have:
+
+
+5 TB orders
+
+
+ and the business asks:
+
+
+SELECT *
+FROM orders_partitioned
+WHERE order_date = '2026-01-14';
+
+
+ Hive can avoid scanning unrelated date partitions.
+
+ Conceptually:
+
+
+orders_partitioned/
+
+order_date=2026-01-05/
+order_date=2026-01-06/
+order_date=2026-01-07/
+...
+order_date=2026-01-14/
+
+
+ Only the relevant partition needs to be read.
+
+---
+
+ # 36. STEP 8 — Data Quality Checks
+
+ A corporate project should not only transform data. It should validate it.
+
+ // Null order IDs
+
+
+SELECT COUNT(*)
+FROM orders_raw
+WHERE order_id IS NULL;
+
+
+ Expected:
+
+
+0
+
+
+ // Null customers
+
+
+SELECT COUNT(*)
+FROM orders_raw
+WHERE customer_id IS NULL;
+
+
+ Expected:
+
+
+0
+
+
+ // Invalid amount
+
+
+SELECT COUNT(*)
+FROM orders_raw
+WHERE amount IS NULL;
+
+
+ Expected:
+
+
+0
+
+
+ // Negative amount
+
+
+SELECT COUNT(*)
+FROM orders_transformed
+WHERE amount < 0;
+
+
+ Expected:
+
+
+0
+
+
+---
+
+ # 37. Referential Integrity Check
+
+ Find orders whose customer doesn't exist:
+
+
+SELECT
+    o.customer_id,
+    COUNT(*) AS order_count
+FROM orders_transformed o
+LEFT JOIN customers_raw c
+    ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL
+GROUP BY o.customer_id;
+
+
+ Expected:
+
+
+Empty result
+
+
+ This means all orders have a valid customer.
+
+---
+
+ # 38. Source-to-Target Reconciliation
+
+ A useful corporate validation:
+
+
+SELECT COUNT(*) FROM orders_raw;
+
+
+ Expected:
+
+
+20
+
+
+ Then:
+
+
+SELECT COUNT(*) FROM orders_transformed;
+
+
+ Expected:
+
+
+20
+
+
+ Therefore:
+
+
+RAW records       = 20
+TRANSFORMED       = 20
+
+
+---
+
+ # 39. Total Revenue Validation
+
+
+SELECT ROUND(SUM(amount), 2)
+FROM orders_transformed;
+
+
+ Expected:
+
+
+35449.50
+
+
+ Then:
+
+
+SELECT ROUND(SUM(total_spent), 2)
+FROM customer_order_summary;
+
+
+ Expected:
+
+
+35449.50
+
+
+ This is an important reconciliation check.
+
+---
+
+ # 40. STEP 9 — Airflow Installation
+
+ Airflow is not required to execute the Hive SQL manually, but it is valuable for a corporate implementation because it orchestrates:
+
+
+Upload
+  ↓
+Sqoop
+  ↓
+Hive RAW
+  ↓
+Transform
+  ↓
+Analytics
+
+
+ Current Airflow documentation recommends installation with `pip` or `uv`, and Airflow's dependency constraints should be used rather than doing an unconstrained `pip install`.  Apache Airflow
+
+---
+
+ # 41. Create Airflow Virtual Environment
+
+
+cd ~/ecommerce-elt
+
+python3 -m venv airflow_venv
+
+
+ Activate:
+
+
+source airflow_venv/bin/activate
+
+
+ Upgrade pip:
+
+
+pip install --upgrade pip
+
+
+ Set Airflow home:
+
+
+export AIRFLOW_HOME=$HOME/ecommerce-elt/airflow
+
+
+ Persist it:
+
+
+echo 'export AIRFLOW_HOME=$HOME/ecommerce-elt/airflow' >> ~/.bashrc
+
+
+---
+
+ # 42. Install Airflow
+
+ For a real installation, choose the Airflow release compatible with your Python version and use the matching official constraints file. The Airflow documentation explicitly shows this constraints-based installation approach.  Apache Airflow
+
+ For example, with a compatible Python 3.10 environment:
+
+
+AIRFLOW_VERSION=2.10.2
+PYTHON_VERSION=3.10
+
+CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+
+pip install "apache-airflow==${AIRFLOW_VERSION}" 
+    --constraint "${CONSTRAINT_URL}"
+
+
+ Then:
+
+
+airflow version
+
+
+ Expected:
+
+
+2.10.2
+
+
+ For a current production installation, check the official Airflow installation page and select the version/constraint combination matching your Python version rather than blindly copying an old version number.  Apache Airflow
+
+---
+
+ # 43. Initialize Airflow Database
+
+
+airflow db migrate
+
+
+ Create an Airflow user:
+
+
+airflow users create 
+    --username admin 
+    --firstname Admin 
+    --lastname User 
+    --role Admin 
+    --email admin@example.com 
+    --password admin
+
+
+ Start webserver:
+
+
+airflow webserver --port 8080
+
+
+ In another terminal:
+
+
+source ~/ecommerce-elt/airflow_venv/bin/activate
+
+export AIRFLOW_HOME=$HOME/ecommerce-elt/airflow
+
+airflow scheduler
+
+
+ Open:
+
+
+http://localhost:8080
+
+
+---
+
+ # 44. Airflow DAG Architecture
+
+ Your DAG should look like:
+
+
+start
+  |
+  v
+load_orders_hdfs
+  |
+  v
+sqoop_customers
+  |
+  v
+create_raw_tables
+  |
+  v
+transform_orders
+  |
+  v
+customer_summary
+  |
+  +------> daily_sales
+  |
+  +------> top_customers
+
+
+---
+
+ # 45. Airflow DAG
+
+ Create:
+
+
+vi ~/ecommerce-elt/airflow/dags/ecommerce_elt_dag.py
+
+
+ Use:
+
+
+from datetime import datetime
+
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+
+default_args = {
+    "owner": "data-engineering",
+    "depends_on_past": False,
+}
+
+with DAG(
+    dag_id="ecommerce_elt_pipeline",
+    default_args=default_args,
+    start_date=datetime(2026, 1, 1),
+    schedule=None,
+    catchup=False,
+    tags=["ecommerce", "elt", "hive", "sqoop"],
+) as dag:
+
+    load_orders_hdfs = BashOperator(
+        task_id="load_orders_hdfs",
+        bash_command="""
+        hdfs dfs -mkdir -p /data/raw/orders
+        hdfs dfs -put -f 
+        /home/$USER/ecommerce-elt/input/orders.csv 
+        /data/raw/orders/
+        """
+    )
+
+    sqoop_customers = BashOperator(
+        task_id="sqoop_customers",
+        bash_command="""
+        hdfs dfs -rm -r -f /data/raw/customers
+
+        sqoop import 
+        --connect jdbc:mysql://localhost:3306/ecommerce 
+        --username root 
+        --password welcome 
+        --table customers 
+        --target-dir /data/raw/customers 
+        --fields-terminated-by ',' 
+        --lines-terminated-by 'n' 
+        --m 1
+        """
+    )
+
+    create_raw_tables = BashOperator(
+        task_id="create_raw_tables",
+        bash_command="""
+        beeline -u jdbc:hive2://localhost:10000 
+        -f /home/$USER/ecommerce-elt/sql/01_create_raw_tables.sql
+        """
+    )
+
+    transform_orders = BashOperator(
+        task_id="transform_orders",
+        bash_command="""
+        beeline -u jdbc:hive2://localhost:10000 
+        -f /home/$USER/ecommerce-elt/sql/02_transform.sql
+        """
+    )
+
+    customer_summary = BashOperator(
+        task_id="customer_summary",
+        bash_command="""
+        beeline -u jdbc:hive2://localhost:10000 
+        -f /home/$USER/ecommerce-elt/sql/03_customer_summary.sql
+        """
+    )
+
+    daily_sales = BashOperator(
+        task_id="daily_sales",
+        bash_command="""
+        beeline -u jdbc:hive2://localhost:10000 
+        -f /home/$USER/ecommerce-elt/sql/04_daily_sales.sql
+        """
+    )
+
+    top_customers = BashOperator(
+        task_id="top_customers",
+        bash_command="""
+        beeline -u jdbc:hive2://localhost:10000 
+        -f /home/$USER/ecommerce-elt/sql/05_top_customers.sql
+        """
+    )
+
+    load_orders_hdfs >> sqoop_customers
+    sqoop_customers >> create_raw_tables
+    create_raw_tables >> transform_orders
+    transform_orders >> customer_summary
+    transform_orders >> daily_sales
+    customer_summary >> top_customers
+
+
+---
+
+ # 46. Create SQL Files for Airflow
+
+ // `01_create_raw_tables.sql`
+
+
+CREATE DATABASE IF NOT EXISTS ecommerce_dw;
+
+USE ecommerce_dw;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS orders_raw (
+    order_id STRING,
+    customer_id STRING,
+    amount STRING,
+    order_date STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/data/raw/orders'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+CREATE EXTERNAL TABLE IF NOT EXISTS customers_raw (
+    customer_id STRING,
+    name STRING,
+    email STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/data/raw/customers';
+
+
+---
+
+ # 47. `02_transform.sql`
+
+
+USE ecommerce_dw;
+
+DROP TABLE IF EXISTS orders_transformed;
+
+CREATE TABLE orders_transformed (
+    order_id STRING,
+    customer_id STRING,
+    amount DOUBLE,
+    order_date DATE
+)
+STORED AS PARQUET;
+
+INSERT OVERWRITE TABLE orders_transformed
+SELECT
+    order_id,
+    customer_id,
+    CAST(amount AS DOUBLE),
+    CAST(order_date AS DATE)
+FROM orders_raw
+WHERE order_id IS NOT NULL
+  AND customer_id IS NOT NULL
+  AND amount IS NOT NULL
+  AND order_date IS NOT NULL;
+
+
+---
+
+ # 48. `03_customer_summary.sql`
+
+
+USE ecommerce_dw;
+
+DROP TABLE IF EXISTS customer_order_summary;
+
+CREATE TABLE customer_order_summary (
+    customer_id STRING,
+    name STRING,
+    total_spent DOUBLE,
+    total_orders INT
+)
+STORED AS PARQUET;
+
+INSERT OVERWRITE TABLE customer_order_summary
+SELECT
+    c.customer_id,
+    c.name,
+    SUM(o.amount),
+    COUNT(o.order_id)
+FROM orders_transformed o
+JOIN customers_raw c
+    ON o.customer_id = c.customer_id
+GROUP BY
+    c.customer_id,
+    c.name;
+
+
+---
+
+ # 49. `04_daily_sales.sql`
+
+
+USE ecommerce_dw;
+
+DROP TABLE IF EXISTS daily_sales_summary;
+
+CREATE TABLE daily_sales_summary (
+    order_date DATE,
+    total_sales DOUBLE,
+    total_orders INT
+)
+STORED AS PARQUET;
+
+INSERT OVERWRITE TABLE daily_sales_summary
+SELECT
+    order_date,
+    SUM(amount),
+    COUNT(order_id)
+FROM orders_transformed
+GROUP BY order_date;
+
+
+---
+
+ # 50. `05_top_customers.sql`
+
+
+USE ecommerce_dw;
+
+SELECT
+    customer_id,
+    name,
+    ROUND(total_spent, 2) AS total_spent,
+    total_orders
+FROM customer_order_summary
+ORDER BY total_spent DESC
+LIMIT 10;
+
+
+---
+
+ # 51. Trigger Airflow DAG
+
+ Check:
+
+
+airflow dags list
+
+
+ Expected:
+
+
+ecommerce_elt_pipeline
+
+
+ Test:
+
+
+airflow dags test ecommerce_elt_pipeline 2026-01-15
+
+
+ Or from the Airflow UI:
+
+
+DAGs
+  ↓
+ecommerce_elt_pipeline
+  ↓
+Trigger
+
+
+---
+
+ # 52. Expected Airflow Execution
+
+ The Airflow UI should show:
+
+
+load_orders_hdfs       SUCCESS
+          |
+sqoop_customers        SUCCESS
+          |
+create_raw_tables      SUCCESS
+          |
+transform_orders       SUCCESS
+          |
+     +----+----+
+     |         |
+customer     daily
+summary      sales
+     |
+top_customers
+
+
+ Green = successful task.
+
+---
+
+ # 53. Final Analytics
+
+ After the DAG succeeds:
+
+
+beeline -u jdbc:hive2://localhost:10000
+
+
+ Run:
+
+
+USE ecommerce_dw;
+
+
+ // Customer Revenue
+
+
+SELECT
+    customer_id,
+    name,
+    ROUND(total_spent,2) AS revenue,
+    total_orders
+FROM customer_order_summary
+ORDER BY revenue DESC;
+
+
+ Expected:
+
+
+C004  Priya Nair       11700.00  4
+C001  John Carter       6901.25  5
+C002  Anita Sharma      4999.50  4
+C003  Ravi Kumar        3899.75  4
+C005  Michael Thomas    3300.25  3
+
+
+---
+
+ # 54. Daily Sales
+
+
+SELECT
+    order_date,
+    ROUND(total_sales,2),
+    total_orders
+FROM daily_sales_summary
+ORDER BY order_date;
+
+
+ Expected:
+
+
+2026-01-05   2149.50   2
+2026-01-06   2550.75   2
+2026-01-07   4450.00   2
+2026-01-08   2550.25   2
+2026-01-09   5150.00   2
+2026-01-10   2100.50   2
+2026-01-11   2749.75   2
+2026-01-12   3600.00   2
+2026-01-13   3050.00   2
+2026-01-14   2450.00   2
+
+
+---
+
+ # 55. Top 3 Customers
+
+
+SELECT
+    customer_id,
+    name,
+    ROUND(total_spent,2) AS total_spent
+FROM customer_order_summary
+ORDER BY total_spent DESC
+LIMIT 3;
+
+
+ Expected:
+
+
+C004  Priya Nair      11700.00
+C001  John Carter      6901.25
+C002  Anita Sharma     4999.50
+
+
+---
+
+ # 56. Complete ELT Flow
+
+ Your final project can be explained as:
+
+
+                 SOURCE SYSTEMS
+                      |
+          +-----------+-----------+
+          |                       |
+          v                       v
+      orders.csv              MySQL
+          |                       |
+          |                       |
+          v                       v
+         HDFS                  Sqoop
+          |                       |
+          +-----------+-----------+
+                      |
+                      v
+                HDFS RAW LAYER
+                      |
+             +--------+--------+
+             |                 |
+             v                 v
+        orders_raw       customers_raw
+             |                 |
+             +--------+--------+
+                      |
+                      v
+                HIVE TRANSFORM
+                      |
+                      v
+             orders_transformed
+                      |
+          +-----------+-----------+
+          |           |           |
+          v           v           v
+      Customer     Daily       Top
+      Summary      Sales      Customers
+          |           |           |
+          +-----------+-----------+
+                      |
+                      v
+                   PARQUET
+                      |
+                      v
+                BI / ANALYTICS
+
+
+---
+
+ # 57. ETL vs ELT
+
+ This distinction is important in interviews.
+
+ | Area | ETL | This ELT Project |
+| --- | --- | --- |
+| Extract | Source | Source |
+| Load | After transformation | Before transformation |
+| Raw data | Often not retained | Retained |
+| Transformation | PySpark/ETL engine | Hive |
+| Data Lake | Optional | Core component |
+| Transformation location | Before warehouse | Inside data platform |
+| Flexibility | Lower | Higher |
+| Reprocessing | May require source reload | Raw data retained |
+
+---
+
+ # 58. Your Interview Explanation
+
+ You can say:
+
+ > "I implemented an ELT-based e-commerce order analytics pipeline. Orders were received as CSV files and customer data came from MySQL. Orders were loaded directly into HDFS as the raw data lake layer, while customer data was ingested from MySQL into HDFS using Sqoop. Hive external tables were created on top of the raw HDFS data without modifying the source data. I then performed the transformation inside Hive by casting data types, validating records and joining orders with customer information. The transformed data was stored in Parquet tables. Finally, I created analytical datasets for customer revenue, daily sales trends and top customers. Airflow was used to orchestrate the end-to-end workflow."
+
+---
+
+ # 59. Interview Question: Why External Tables?
+
+ Answer:
+
+ > "I used external tables for the raw layer because the underlying HDFS files are owned by the data lake rather than Hive. Dropping the Hive table does not mean the raw source data should be deleted."
+
+ Conceptually:
+
+
+HDFS RAW
+   |
+   +---- Hive external table
+   |
+   +---- Other processing engines
+
+
+ This makes the raw layer reusable.
+
+---
+
+ # 60. Interview Question: Why Parquet?
+
+ Answer:
+
+ > "The raw layer is stored as source-oriented text data, while the transformed warehouse layer uses Parquet because it is a columnar format and is better suited for analytical queries."
+
+ So:
+
+
+RAW
+ ↓
+CSV/Text
+
+WAREHOUSE
+ ↓
+Parquet
+
+
+---
+
+ # 61. Interview Question: Why Keep RAW Data?
+
+ Answer:
+
+ > "Keeping raw data provides replayability and auditability. If the business logic changes, I can rerun the transformation against the original raw data without requesting the source system to resend the data."
+
+ This is one of the strongest reasons for an ELT architecture.
+
+---
+
+ # 62. Interview Question: Where Does Transformation Happen?
+
+ Answer:
+
+ > "Transformation happens inside Hive after the data has already been loaded into HDFS. We convert the raw amount from STRING to DOUBLE, convert order_date to DATE, perform validation, join customer and order data, and aggregate the data into analytical Parquet tables."
+
+---
+
+ # 63. Interview Question: What Is Airflow Doing?
+
+ Answer:
+
+ > "Airflow is the orchestration layer. It doesn't replace Hive or Sqoop. It controls when each task runs, manages dependencies, provides task status and allows the pipeline to be scheduled and monitored."
+
+ For example:
+
+
+HDFS Load
+    ↓
+Sqoop
+    ↓
+Hive RAW
+    ↓
+Transformation
+    ↓
+Customer Summary
+    ↓
+Daily Sales
+
+
+ Airflow manages these dependencies.
+
+---
+
+ # 64. Corporate-Level Improvements
+
+ If you want to make this look more like a production project, add:
+
+
+RAW
+ ↓
+STAGING
+ ↓
+CURATED
+ ↓
+ANALYTICS
+
+
+ For example:
+
+
+/data/raw/orders
+/data/raw/customers
+
+/data/staging/orders
+
+/data/curated/orders
+
+/data/analytics/customer_summary
+/data/analytics/daily_sales
+
+
+ Also add:
+
+ - Data quality checks
+- Audit counts
+- Logging
+- Airflow retries
+- Email/Slack alerts
+- Incremental Sqoop loads
+- Hive partitions
+- Parquet compression
+- Kerberos in secured clusters
+- MySQL credentials through Airflow Connections/secrets rather than hardcoding passwords
+- Separate dev/test/prod configurations
+
+---
+
+ # 65. Production-Oriented Incremental Design
+
+ Instead of importing the entire customer table every day:
+
+
+FULL LOAD
+
+
+ you can use incremental ingestion where the source has a suitable incremental column.
+
+ Conceptually:
+
+
+MySQL
+   |
+   | WHERE updated_at > last_successful_run
+   v
+Sqoop
+   |
+   v
+HDFS incremental partition
+
+
+ Then Hive processes only new/changed records.
+
+ For a real enterprise pipeline, this is much more realistic than repeatedly performing full loads.
+
+---
+
+ # 66. One Important Correction to Your Original Design
+
+ Your original example has:
+
+
+orders_raw
+amount STRING
+order_date STRING
+
+
+ and then directly:
+
+
+SUM(CAST(o.amount AS DOUBLE))
+
+
+ That works for a simple demonstration, but I recommend the more production-like separation:
+
+
+orders_raw
+     |
+     | validation + casting
+     v
+orders_transformed
+     |
+     +------> customer_order_summary
+     |
+     +------> daily_sales_summary
+     |
+     +------> top customer analysis
+
+
+ This makes the architecture much easier to explain:
+
+
+RAW
+ ↓
+STAGING/CURATED
+ ↓
+ANALYTICS
+
+
+---
+
+ # 67. Final Project Deliverables
+
+ Your project should contain:
+
+
+ecommerce-elt/
+│
+├── input/
+│   └── orders.csv
+│
+├── sql/
+│   ├── 01_create_raw_tables.sql
+│   ├── 02_transform.sql
+│   ├── 03_customer_summary.sql
+│   ├── 04_daily_sales.sql
+│   └── 05_top_customers.sql
+│
+├── airflow/
+│   └── dags/
+│       └── ecommerce_elt_dag.py
+│
+└── README.md
+
+
+ And your data platform contains:
+
+
+HDFS
+│
+└── /data/raw
+    ├── orders
+    │   └── orders.csv
+    │
+    └── customers
+        └── part-m-00000
+
+
+ Hive contains:
+
+
+ecommerce_dw
+│
+├── orders_raw
+├── customers_raw
+├── orders_transformed
+├── customer_order_summary
+├── daily_sales_summary
+└── orders_partitioned
+
+
+---
+
+ # 68. One-Line Architecture for Your Resume
+
+ > "Implemented an ELT-based e-commerce analytics pipeline using HDFS, Hive, Sqoop and Airflow, loading raw CSV/MySQL data into a data lake, transforming it in Hive, storing curated datasets in Parquet, and generating customer revenue, daily sales and top-customer analytics."
+
+---
+
+ // Technology Flow to Remember
+
+
+                 EXTRACT
+                    |
+        +-----------+-----------+
+        |                       |
+     CSV File                MySQL
+        |                       |
+        |                     Sqoop
+        |                       |
+        +-----------+-----------+
+                    |
+                    v
+                 LOAD
+                    |
+                    v
+                  HDFS
+               RAW DATA LAKE
+                    |
+                    v
+             Hive External Tables
+                    |
+                    v
+               TRANSFORM
+                    |
+                    v
+                  Hive
+                    |
+        +-----------+-----------+
+        |           |           |
+        v           v           v
+   Customer      Daily       Top
+   Revenue       Sales     Customers
+        |           |           |
+        +-----------+-----------+
+                    |
+                    v
+                 Parquet
+                    |
+                    v
+               ANALYTICS
+
+
+ That is the complete ELT story: load first → retain raw data → transform inside Hive → create analytical Parquet tables → orchestrate the pipeline with Airflow.
+
+ For current Hive installation/reference, Apache's official documentation covers manual installation, HiveServer2/Beeline, and its HDFS prerequisites.  Apache Hive+1  For Airflow, use its current official constraints-based installation instructions because Airflow/Python compatibility changes over time.  Apache Airflow

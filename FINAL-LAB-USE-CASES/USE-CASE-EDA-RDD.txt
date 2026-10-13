@@ -1,0 +1,142 @@
+//USE CASE -8 
+//EDA-RDD
+
+//source ~/spark-venv/bin/activate
+
+//pyspark --version
+
+//cd ~
+//mkdir -p telecom-pyspark/data
+//cd ~/telecom-pyspark
+
+//nano data/telecom_customers.csv
+
+//cat data/telecom_customers.csv
+
+customer_id,name,age,city,monthly_bill,tenure,plan
+C001,Rahul,28,Bengaluru,599,12,Premium
+C002,Priya,35,Mumbai,799,24,Premium
+C003,Amit,42,Delhi,450,36,Basic
+C004,Neha,,Bengaluru,699,18,Premium
+C005,Arun,31,Chennai,,10,Basic
+C006,Kiran,27,Mumbai,999,30,Premium
+C007,Divya,45,Delhi,550,48,Basic
+C008,Ravi,29,Bengaluru,650,15,Premium
+C009,Anita,38,Chennai,500,,Basic
+C010,Suresh,52,Mumbai,1200,60,Premium
+
+//nano telecom_eda_rdd.py
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg, count, col
+
+spark = SparkSession.builder \
+    .appName("TelecomCustomerAnalytics") \
+    .master("local[*]") \
+    .config("spark.hadoop.fs.defaultFS", "file:///") \
+    .getOrCreate()
+
+df = spark.read.csv(
+    "file:///home/ubuntu/telecom-pyspark/data/telecom_customers.csv",
+    header=True,
+    inferSchema=True
+)
+
+print("\nOriginal Data:")
+df.show()
+
+print("\nOriginal Schema:")
+df.printSchema()
+
+df_clean = df.fillna({
+    "age": 0,
+    "monthly_bill": 0.0,
+    "tenure": 0
+})
+
+df_clean = df_clean \
+    .withColumn("age", col("age").cast("integer")) \
+    .withColumn("monthly_bill", col("monthly_bill").cast("double")) \
+    .withColumn("tenure", col("tenure").cast("integer"))
+
+print("\nCleaned Data:")
+df_clean.show()
+
+print("\nCleaned Schema:")
+df_clean.printSchema()
+
+print("\nTotal Customers:")
+print(df_clean.count())
+
+print("\nAverage Monthly Bill:")
+df_clean.select(
+    avg("monthly_bill").alias("average_monthly_bill")
+).show()
+
+print("\nCustomers By City:")
+df_clean.groupBy("city") \
+    .agg(count("*").alias("customer_count")) \
+    .orderBy(col("customer_count").desc()) \
+    .show()
+
+print("\nHigh Bill Customers:")
+df_clean.filter(
+    col("monthly_bill") > 700
+).show()
+
+print("\nAverage Bill By Plan:")
+df_clean.groupBy("plan") \
+    .agg(avg("monthly_bill").alias("average_bill")) \
+    .show()
+
+print("\nRDD Demonstration:")
+
+rdd = spark.sparkContext.parallelize(
+    [100, 200, 300, 400, 500]
+)
+
+print("Original RDD:")
+print(rdd.collect())
+
+rdd_doubled = rdd.map(
+    lambda x: x * 2
+)
+
+print("RDD After map:")
+print(rdd_doubled.collect())
+
+rdd_filtered = rdd.filter(
+    lambda x: x > 250
+)
+
+print("RDD After filter:")
+print(rdd_filtered.collect())
+
+print("RDD Count:")
+print(rdd_filtered.count())
+
+print("\nCaching DataFrame:")
+
+df_clean.cache()
+
+print("First Count:")
+print(df_clean.count())
+
+print("Second Action - Average:")
+print(
+    df_clean.select(
+        avg("monthly_bill")
+    ).collect()
+)
+
+spark.stop()
+
+print("\nSpark Application Completed")
+
+
+
+//rm -rf output
+
+//http://localhost:4040
+
+//spark-submit telecom_eda_rdd.py

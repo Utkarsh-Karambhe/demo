@@ -1,0 +1,713 @@
+// Remote Login Using PuTTY / Mac Terminal / Ubuntu Terminal
+
+// Use Case: Remote Login to an Ubuntu Linux Server
+
+Scenario:
+
+A company has an Ubuntu server running in its data center/cloud. A developer or system administrator is working from a Windows, Mac, or another Ubuntu machine.
+
+Instead of physically accessing the server, they remotely connect using SSH (Secure Shell).
+
+
+Administrator Laptop
+       |
+       | SSH connection
+       |
+       v
++-----------------------+
+|   Ubuntu Server       |
+|                       |
+| SSH Server (sshd)     |
+| Port: 22              |
+|                       |
+| /home/devuser         |
++-----------------------+
+
+
+The same Ubuntu server can be accessed using:
+
+* Windows → PuTTY
+* Mac → Terminal
+* Ubuntu → Terminal
+
+---
+
+// 1. What We Need
+
+For this lab, assume:
+
+| Machine        | Purpose         |
+| -------------- | --------------- |
+| Windows laptop | Client          |
+| Ubuntu Server  | Remote machine  |
+| Username       | `devuser`       |
+| Server IP      | `192.168.1.100` |
+| SSH Port       | `22`            |
+
+> `192.168.1.100` is an example. Your actual Ubuntu server will have a different IP.
+
+
+// 2. Step 1: Find Ubuntu Server IP
+
+On the Ubuntu server run:
+
+
+ip addr
+
+
+or:
+
+
+hostname -I
+
+
+Example:
+
+
+192.168.1.100
+
+
+So our server is:
+
+
+Server IP = 192.168.1.100
+
+
+---
+
+// 3. Step 2: Check SSH Server
+
+Ubuntu needs an SSH server.
+
+Check:
+
+
+sudo systemctl status ssh
+
+
+You may see:
+
+
+Active: active (running)
+
+
+If SSH is not installed:
+
+
+sudo apt update
+sudo apt install openssh-server -y
+
+
+Start SSH:
+
+
+sudo systemctl start ssh
+
+
+Enable SSH automatically after reboot:
+
+
+sudo systemctl enable ssh
+
+
+Check again:
+
+
+sudo systemctl status ssh
+
+
+You should see:
+
+
+Active: active (running)
+
+
+---
+
+// 4. Step 3: Create a Remote User
+
+On the Ubuntu server:
+
+
+sudo adduser devuser
+
+
+It will ask for a password.
+
+Example:
+
+
+Enter new UNIX password:
+Retype new UNIX password:
+
+
+You can press Enter for the optional information.
+
+Then test that the user exists:
+
+
+id devuser
+
+
+Example:
+
+
+uid=1001(devuser) gid=1001(devuser) groups=1001(devuser)
+
+
+---
+
+// 5. Step 4: Test SSH Port
+
+SSH normally uses:
+
+
+Port 22
+
+
+On Ubuntu:
+
+
+sudo ss -tlnp | grep :22
+
+
+Example:
+
+
+LISTEN 0 128 0.0.0.0:22
+
+
+This means the SSH service is listening on port 22.
+
+---
+
+// 6. Windows → Ubuntu Using PuTTY
+
+Now imagine the administrator is sitting on a Windows laptop.
+
+Install/open PuTTY.
+
+Enter:
+Host Name:
+192.168.1.100
+
+Port:
+22
+
+Connection type:
+SSH
+
+
+Then click:
+
+
+Open
+
+
+---
+
+// 7. First-Time SSH Warning
+
+You may see a security message similar to:
+
+
+The server's host key is not cached in the registry.
+
+
+For your own lab server, verify that the server is the one you intend to connect to, then accept/store the host key.
+
+PuTTY opens a terminal.
+
+You will see:
+
+
+login as:
+
+
+Enter:
+
+
+devuser
+
+
+Then enter the password.
+
+If successful:
+
+
+devuser@ubuntu-server:~$
+
+
+You are now remotely logged into Ubuntu.
+
+---
+
+// 8. Test the Remote Connection
+
+Run:
+
+
+whoami
+
+
+Output:
+
+
+devuser
+
+
+Check the server:
+
+
+hostname
+
+
+Example:
+
+
+ubuntu-server
+
+
+Check IP:
+
+
+hostname -I
+
+
+Check current directory:
+
+
+pwd
+
+
+Output:
+
+
+/home/devuser
+
+
+List files:
+
+
+ls
+
+
+---
+
+// 9. Important Concept
+
+Notice something important.
+
+You are sitting on:
+
+
+Windows Laptop
+
+
+But after SSH login:
+
+
+devuser@ubuntu-server:~$
+
+
+Commands are executing on:
+
+
+Ubuntu Server
+
+
+Not on your Windows machine.
+
+For example:
+
+
+mkdir project
+
+
+creates:
+
+
+/home/devuser/project
+
+
+on the Ubuntu server.
+
+---
+
+// 10. Mac → Ubuntu Using Terminal
+
+On a Mac, you don't normally need PuTTY.
+
+Open:
+
+
+Terminal
+
+
+Run:
+
+
+ssh devuser@192.168.1.100
+
+
+SSH means:
+
+
+ssh username@server-ip
+
+
+You may see:
+
+
+The authenticity of host '192.168.1.100' can't be established.
+Are you sure you want to continue connecting (yes/no)?
+
+
+For your lab server, verify the host and enter:
+
+
+yes
+
+
+Then:
+
+
+devuser@192.168.1.100's password:
+
+
+Enter the password.
+
+You are connected.
+
+
+devuser@ubuntu-server:~$
+
+
+---
+
+// 11. Ubuntu → Ubuntu Using Terminal
+
+Suppose you have another Ubuntu machine.
+
+From the client Ubuntu machine:
+
+
+ssh devuser@192.168.1.100
+
+
+Enter the password.
+
+You get:
+
+
+devuser@ubuntu-server:~$
+
+
+Again, you are remotely connected.
+
+---
+
+// 12. SSH with a Different Port
+
+Suppose the administrator changes SSH from port 22 to port 2222.
+
+Then:
+
+// Mac / Ubuntu
+
+
+ssh -p 2222 devuser@192.168.1.100
+
+
+// PuTTY
+
+Enter:
+
+
+Host Name: 192.168.1.100
+Port: 2222
+Connection type: SSH
+
+
+---
+
+// 13. Corporate Example
+
+Imagine a company has:
+
+
+Application Server
+IP: 10.10.20.50
+
+
+A developer needs to check application logs.
+
+Instead of physically going to the server:
+
+
+Developer Laptop
+       |
+       | SSH
+       | Port 22
+       v
+Application Server
+10.10.20.50
+
+
+Developer connects:
+
+
+ssh devuser@10.10.20.50
+
+
+Then:
+
+
+cd /var/log
+
+
+Check logs:
+
+
+ls
+
+
+For example:
+
+
+application.log
+error.log
+access.log
+
+
+View the latest logs:
+
+
+tail -f application.log
+
+
+Now the developer can monitor the application remotely.
+
+---
+
+// 14. Another Corporate Example: Restart Application
+
+Suppose an application is running as a systemd service:
+
+
+sales-app.service
+
+
+Administrator connects:
+
+
+ssh devuser@10.10.20.50
+
+
+Checks service:
+
+
+sudo systemctl status sales-app
+
+
+If required:
+
+
+sudo systemctl restart sales-app
+
+
+Then:
+
+
+sudo systemctl status sales-app
+
+
+This is a common reason for remote Linux administration.
+
+---
+
+// 15. Useful Remote Commands
+
+After connecting through SSH:
+
+// Check username
+
+
+whoami
+
+
+// Check server name
+
+
+hostname
+
+
+// Check IP
+
+
+hostname -I
+
+
+// Check current directory
+
+
+pwd
+
+
+// List files
+
+
+ls -l
+
+
+// Check disk
+
+
+df -h
+
+
+// Check memory
+
+
+free -h
+
+
+// Check running processes
+
+
+ps aux
+
+
+// Check uptime
+
+
+uptime
+
+
+// Check OS
+
+
+cat /etc/os-release
+
+
+---
+
+// 16. How to Exit Remote Server
+
+When finished:
+
+
+exit
+
+
+You return to your local machine.
+
+For example:
+
+
+devuser@ubuntu-server:~$ exit
+logout
+
+
+Now you are back on your:
+
+
+Windows / Mac / Ubuntu client
+
+
+---
+
+// 17. Complete Lab Flow
+
+
+
+STEP 1
+Ubuntu Server
+     |
+     v
+hostname -I
+     |
+     v
+Get Server IP
+192.168.1.100
+
+STEP 2
+Install SSH
+     |
+     v
+sudo apt install openssh-server -y
+
+STEP 3
+Start SSH
+     |
+     v
+sudo systemctl start ssh
+
+STEP 4
+Create user
+     |
+     v
+sudo adduser devuser
+
+STEP 5
+Windows / Mac / Ubuntu
+     |
+     v
+SSH Client
+     |
+     v
+ssh devuser@192.168.1.100
+     |
+     v
+Password
+     |
+     v
+Ubuntu Server
+     |
+     v
+Run Linux commands
+     |
+     v
+exit
+
+
+---
+
+// 18. PuTTY vs Mac vs Ubuntu
+
+| Client           | Command / Method             |
+
+| Windows          | PuTTY                        |
+| Mac              | `ssh user@server-ip`         |
+| Ubuntu           | `ssh user@server-ip`         |
+| SSH default port | `22`                         |
+| Protocol         | SSH                          |
+| Purpose          | Secure remote administration |
+
+// Interview Question
+
+Q: What is SSH?
+Answer:
+SSH, or Secure Shell, is a network protocol used to securely connect to and manage a remote system. It provides encrypted communication between the client and server and commonly uses TCP port 22.
+
+Q: What is PuTTY?
+PuTTY is an SSH/Telnet client commonly used on Windows to connect to remote servers.
+
+Q: What happens when we run:
+ssh devuser@192.168.1.100
+
+
+//It means:
+ssh       → SSH client
+devuser   → remote username
+@         → at
+192.168.1.100 → remote server IP
+
+
+So:
+Connect to 192.168.1.100
+using the account devuser
+through SSH.
+
+
+For a corporate-level next lab the natural next step is SSH key-based login (private key/public key) instead of passwords followed by SCP file transfer and remote application deployment.

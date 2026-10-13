@@ -1,0 +1,545 @@
+//Banking — Transaction Type Analysis
+
+1. Objective
+
+Analyze banking transaction records and count the number of transactions for each transaction type.
+
+Example:
+
+Transaction ID	Type	Amount
+TXN001	ATM	5000
+TXN002	UPI	1200
+TXN003	ATM	3000
+TXN004	NEFT	15000
+TXN005	UPI	800
+TXN006	ATM	2000
+TXN007	NEFT	10000
+
+Business requirement
+
+The bank wants to know:
+
+ATM   → 3 transactions
+UPI   → 2 transactions
+NEFT  → 2 transactions
+Map stage
+
+Mapper reads one record at a time and emits:
+
+ATM     1
+UPI     1
+ATM     1
+NEFT    1
+UPI     1
+ATM     1
+NEFT    1
+
+Conceptually:
+
+Input
+  |
+  v
+Mapper
+  |
+  +---- ATM   1
+  +---- UPI   1
+  +---- ATM   1
+  +---- NEFT  1
+  +---- UPI   1
+  +---- ATM   1
+  +---- NEFT  1
+Shuffle and Sort stage
+
+Hadoop groups identical keys:
+
+ATM  → [1,1,1]
+NEFT → [1,1]
+UPI  → [1,1]
+Reduce stage
+
+Reducer adds the values:
+
+ATM  → 3
+NEFT → 2
+UPI  → 2
+Final output
+ATM     3
+NEFT    2
+UPI     2
+Corporate application
+
+This type of MapReduce processing can be used for:
+
+Banking transaction analytics
+ATM usage analysis
+UPI transaction monitoring
+Payment-channel statistics
+Daily transaction reports
+
+Expected result:
+
+ATM     3
+NEFT    2
+UPI     2
+
+//PART 1 — Verify Java and Hadoop
+Step 1 — Check Java
+java -version
+
+Expected:
+
+openjdk version "1.8.0_472"
+
+Check compiler:
+
+javac -version
+
+Expected:
+
+javac 1.8.0_472
+
+//if other versions,
+//See installed Java versions
+ls /usr/lib/jvm/
+
+You should see something similar to:
+
+java-8-openjdk-amd64
+java-11-openjdk-amd64
+java-17-openjdk-amd64
+java-21-openjdk-amd64
+
+//Switch java to Java 8
+sudo update-alternatives --config java
+
+Check Java home:
+
+echo $JAVA_HOME
+
+Expected:
+
+/usr/lib/jvm/java-8-openjdk-amd64
+
+//Switch javac to Java 8
+This is important. Java and javac should match.
+
+sudo update-alternatives --config javac
+
+//Select:
+
+/usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+
+//go to
+r
+
+//add
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+
+source ~/.bashrc
+
+//verify version now 
+
+
+//Step 2 — Check Hadoop
+hadoop version
+
+Expected:
+
+Hadoop 3.3.6
+
+You should see something similar to:
+
+Hadoop 3.3.6
+Subversion ...
+Compiled by ubuntu ...
+PART 2 — Start Hadoop Services
+
+
+//Step 3 — Start SSH
+sudo service ssh start
+
+Expected:
+
+ * Starting OpenBSD Secure Shell server sshd
+
+If it says already running, that is fine.
+
+Check:
+
+sudo service ssh status
+
+Expected:
+
+Active: active (running)
+
+
+//Step 4 — Start HDFS
+start-dfs.sh
+
+Expected messages similar to:
+
+Starting namenodes on [localhost]
+Starting datanodes
+Starting secondary namenodes [localhost]
+
+Check:
+
+jps
+
+Expected:
+
+NameNode
+DataNode
+SecondaryNameNode
+
+
+//PART 3 — Start YARN
+Step 5 — Start YARN
+start-yarn.sh
+
+Expected:
+
+Starting resourcemanager
+Starting nodemanagers
+
+Check:
+
+jps
+
+Expected:
+
+NameNode
+DataNode
+SecondaryNameNode
+ResourceManager
+NodeManager
+
+Your exact ordering may be different.
+
+
+//PART 4 — Create Banking Project
+//Step 6 — Create project directories
+
+mkdir -p ~/banking-mapreduce/src/com/company/banking
+mkdir -p ~/banking-mapreduce/classes
+cd ~/banking-mapreduce
+
+//Check:
+find .
+
+//Expected:
+.
+./src
+./src/com
+./src/com/company
+./src/com/company/banking
+./classes
+
+//PART 5 — Create Transaction Input
+//Step 7 — Create input file
+cd ~/banking-mapreduce
+nano transactions.csv
+
+//Enter:
+
+TXN001,ATM,5000
+TXN002,UPI,1200
+TXN003,ATM,3000
+TXN004,NEFT,15000
+TXN005,UPI,800
+TXN006,ATM,2000
+TXN007,NEFT,10000
+
+Save:
+
+Ctrl + O
+
+Press:
+
+Enter
+
+Exit:
+
+Ctrl + X
+
+Step 8 — Verify input
+cat transactions.csv
+
+Expected:
+
+TXN001,ATM,5000
+TXN002,UPI,1200
+TXN003,ATM,3000
+TXN004,NEFT,15000
+TXN005,UPI,800
+TXN006,ATM,2000
+TXN007,NEFT,10000
+
+//Count records:
+
+wc -l transactions.csv
+
+//Expected:
+
+7 transactions.csv
+
+//PART 6 — Create Mapper
+//Step 9 — Create Mapper Java file
+
+cd ~/banking-mapreduce
+nano src/com/company/banking/TransactionMapper.java
+
+//add
+package com.company.banking;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class TransactionMapper
+        extends Mapper<Object, Text, Text, IntWritable> {
+
+    private final static IntWritable one = new IntWritable(1);
+    private Text transactionType = new Text();
+
+    @Override
+    public void map(Object key, Text value, Context context)
+            throws IOException, InterruptedException {
+
+        String[] fields = value.toString().split(",");
+
+        if (fields.length == 3) {
+
+            String type = fields[1].trim();
+
+            transactionType.set(type);
+
+            context.write(transactionType, one);
+        }
+    }
+}
+
+//PART 8 — Create Reducer
+//Step 10 — Create Reducer
+
+nano src/com/company/banking/TransactionReducer.java
+
+//
+package com.company.banking;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+
+public class TransactionReducer
+        extends Reducer<Text, IntWritable, Text, IntWritable> {
+
+    private IntWritable result = new IntWritable();
+
+    @Override
+    public void reduce(Text key, Iterable<IntWritable> values,
+                       Context context)
+            throws IOException, InterruptedException {
+
+        int sum = 0;
+
+        for (IntWritable value : values) {
+            sum += value.get();
+        }
+
+        result.set(sum);
+
+        context.write(key, result);
+    }
+}
+
+//PART 10 — Create Driver Program
+
+The Driver tells Hadoop:
+
+Where the input is
+Where the output should go
+Which Mapper to use
+Which Reducer to use
+What the input/output data types are
+
+//Step 11 — Create Driver
+nano src/com/company/banking/BankingTransactionDriver.java
+
+//add
+package com.company.banking;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class BankingTransactionDriver {
+
+    public static void main(String[] args) throws Exception {
+
+        if (args.length != 2) {
+            System.err.println(
+                "Usage: BankingTransactionDriver <input> <output>"
+            );
+            System.exit(2);
+        }
+
+        Configuration conf = new Configuration();
+
+        Job job = Job.getInstance(conf,
+                "Banking Transaction Type Analysis");
+
+        job.setJarByClass(BankingTransactionDriver.class);
+
+        job.setMapperClass(TransactionMapper.class);
+        job.setReducerClass(TransactionReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(IntWritable.class);
+
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
+
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
+    }
+}
+
+//PART 11 — Verify Java Files
+//Step 12
+cd ~/banking-mapreduce
+find src -type f
+
+//Expected:
+
+src/com/company/banking/TransactionMapper.java
+src/com/company/banking/TransactionReducer.java
+src/com/company/banking/BankingTransactionDriver.java
+
+
+//
+cd ~/banking-mapreduce
+
+mkdir -p classes
+
+javac -classpath "$(hadoop classpath)" -d classes src/com/company/banking/*.java
+
+find classes -type f
+
+//expect
+classes/com/company/banking/TransactionMapper.class
+classes/com/company/banking/TransactionReducer.class
+classes/com/company/banking/BankingTransactionDriver.class
+
+
+//check jar
+jar -cvf banking-mapreduce.jar -C classes .
+
+ ls -lh banking-mapreduce.jar
+//expect
+-rw-r--r-- 1 sari sari 3.5K Sep 23 16:38 banking-mapreduce.jar
+
+
+//PART 15 — Upload Transaction Data to HDFS
+//Step 16
+cd ~/banking-mapreduce
+hdfs dfs -mkdir -p /banking/transactions/input
+hdfs dfs -put -f transactions.csv /banking/transactions/input/
+
+//Check:
+
+hdfs dfs -ls /banking/transactions/input
+
+//Expected:
+
+Found 1 items
+-rw-r--r--   1 sari supergroup ... /banking/transactions/input/transactions.csv
+
+
+//PART 16 — Verify Data in HDFS
+//Step 17
+hdfs dfs -cat /banking/transactions/input/transactions.csv
+
+//Expected:
+
+TXN001,ATM,5000
+TXN002,UPI,1200
+TXN003,ATM,3000
+TXN004,NEFT,15000
+TXN005,UPI,800
+TXN006,ATM,2000
+TXN007,NEFT,10000
+
+This confirms that the data is actually stored in HDFS.
+
+//PART 17 — Run MapReduce Job
+
+//Step 18 — Remove previous output directory
+Hadoop does not allow the output directory to already exist.
+
+hdfs dfs -rm -r -f /banking/transactions/output
+
+If it says the directory does not exist, that is fine.
+//check
+which java
+java -version
+which javac
+javac -version
+echo $JAVA_HOME
+/usr/lib/jvm/java-8-openjdk-amd64/bin/java
+
+//everything should be java 8
+
+//then check 
+ grep -n "JAVA_HOME" /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+//this should be 8 . otherwise 
+
+ nano /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+//add
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+
+//restart dfs & yarn
+//
+nano /usr/local/hadoop/etc/hadoop/hadoop-env.sh
+
+//delete entire line and save
+export HADOOP_OPTS="$HADOOP_OPTS --add-opens=java.base/java.lang=ALL-UNNAMED"
+
+//Step 19 — Run the MapReduce job
+hadoop jar ~/banking-mapreduce/banking-mapreduce.jar \
+com.company.banking.BankingTransactionDriver \
+/banking/transactions/input \
+/banking/transactions/output
+
+
+
+//PART 18 — Check MapReduce Output
+//Step 20
+hdfs dfs -ls /banking/transactions/output
+
+//Expected:
+
+Found 2 items
+-rw-r--r--   1 sari supergroup ... /banking/transactions/output/_SUCCESS
+-rw-r--r--   1 sari supergroup ... /banking/transactions/output/part-r-00000
+
+//final result 
+hdfs dfs -cat /banking/transactions/output/part-r-00000
+
+//
+ATM     3
+NEFT    2
+UPI     2

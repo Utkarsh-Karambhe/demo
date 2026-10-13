@@ -1,0 +1,2633 @@
+Telecom Customer Usage ETL project MySQL, Sqoop, HDFS, Hive, Airflow, Cron, Sensor, Hook, DAG, UI execution, expected outputs, testing and interview explanation.
+
+# PROJECT
+
+// Automated Telecom Customer Usage ETL Pipeline
+
+// Technologies
+
+```text
+MySQL
+   ↓
+Sqoop
+   ↓
+HDFS
+   ↓
+Hive
+   ↓
+Apache Airflow
+   ↓
+Analytics
+```
+
+Airflow controls:
+
+```text
+Cron
+  ↓
+Sensor
+  ↓
+Hook
+  ↓
+Sqoop
+  ↓
+Hive
+  ↓
+Report
+```
+
+# 1. PROJECT PROBLEM STATEMENT
+
+A telecom company stores daily customer usage information in a MySQL database.
+
+Every day, the company wants to process:
+
+* Call minutes
+* SMS count
+* Mobile data usage
+* Customer plan
+* Telecom circle
+
+The company wants to automatically:
+
+1. Extract MySQL data using Sqoop.
+2. Store raw data in HDFS.
+3. Wait for confirmation that the daily data is ready.
+4. Validate the ready condition.
+5. Transform data using Hive.
+6. Generate customer usage summaries.
+7. Schedule the entire pipeline using Airflow.
+8. Retry failed tasks.
+9. Monitor the pipeline from Airflow UI.
+
+
+# 2. FINAL ARCHITECTURE
+
+```text
+                    TELECOM SOURCE
+                         |
+                         v
+                    MySQL Database
+                    telecom_db
+                         |
+                         |
+                       Sqoop
+                         |
+                         v
+                  HDFS RAW LAYER
+                         |
+                         |
+                   Airflow Sensor
+                         |
+                  usage.ready?
+                         |
+                         v
+                       Hook
+                         |
+                         v
+                  Hive Transformation
+                         |
+                         v
+               Customer Usage Fact
+                         |
+                         v
+             Customer Usage Summary
+                         |
+                         v
+                    Analytics
+```
+
+//Airflow controls the whole process:
+
+```text
+                         AIRFLOW
+                            |
+                     Cron: 2:00 AM
+                            |
+                            v
+                    FileSensor
+                            |
+                            v
+                     FSHook / Hook
+                            |
+                            v
+                    Sqoop Extraction
+                            |
+                            v
+                    Hive Transformation
+                            |
+                            v
+                     Usage Summary
+
+
+# PART 1 — CHECK YOUR EXISTING ENVIRONMENT
+
+Open WSL Ubuntu.
+
+```bash
+cd ~
+```
+
+Check Ubuntu:
+
+```bash
+lsb_release -a
+```
+
+Expected approximately:
+
+```text
+Distributor ID: Ubuntu
+Description: Ubuntu 24.04.x LTS
+```
+
+---
+
+// Step 1. Check Java
+
+```bash
+java -version
+```
+
+For your existing Hadoop/Sqoop lab we expect Java 8.
+
+```text
+openjdk version "1.8.0_..."
+```
+
+Check:
+
+```bash
+echo $JAVA_HOME
+```
+
+Expected:
+
+```text
+/usr/lib/jvm/java-8-openjdk-amd64
+```
+
+---
+
+# PART 2 — CHECK HADOOP
+
+```bash
+hadoop version
+```
+
+Expected:
+
+```text
+Hadoop 3.3.6
+```
+
+Check:
+
+```bash
+echo $HADOOP_HOME
+```
+
+Expected:
+
+```text
+/usr/local/hadoop
+```
+
+Check:
+
+```bash
+which hadoop
+```
+
+Expected:
+
+```text
+/usr/local/hadoop/bin/hadoop
+```
+
+---
+
+# PART 3 — START HADOOP
+
+Start SSH:
+
+```bash
+sudo service ssh start
+```
+
+Start HDFS:
+
+```bash
+start-dfs.sh
+```
+
+Start YARN:
+
+```bash
+start-yarn.sh
+```
+
+Check:
+
+```bash
+jps
+```
+
+Expected approximately:
+
+```text
+NameNode
+DataNode
+SecondaryNameNode
+ResourceManager
+NodeManager
+Jps
+```
+
+Check HDFS:
+
+```bash
+hdfs dfs -ls /
+```
+
+Expected:
+
+```text
+Found ...
+```
+
+---
+
+# PART 4 — INSTALL MYSQL
+
+MySQL is our telecom source system.
+
+Current Airflow itself can use MySQL as a supported metadata database, but for this student project we will use MySQL as the business source database and keep Airflow's local metadata database separate. ([Apache Airflow][2])
+
+Install:
+
+```bash
+sudo apt update
+sudo apt install mysql-server -y
+```
+
+Check:
+
+```bash
+mysql --version
+```
+
+Expected:
+
+```text
+mysql  Ver 8.x.x
+```
+
+Start:
+
+```bash
+sudo service mysql start
+```
+
+Check:
+
+```bash
+sudo service mysql status
+```
+
+You should see:
+
+```text
+active (running)
+```
+
+---
+
+# PART 5 — CREATE TELECOM DATABASE
+
+Enter MySQL:
+
+```bash
+sudo mysql
+```
+
+Expected:
+
+```text
+mysql>
+```
+
+Create database:
+
+```sql
+CREATE DATABASE telecom_db;
+```
+
+Select:
+
+```sql
+USE telecom_db;
+```
+
+Expected:
+
+```text
+Database changed
+```
+
+---
+
+# PART 6 — CREATE CUSTOMER USAGE TABLE
+
+Run:
+
+```sql
+CREATE TABLE customer_usage (
+    usage_id INT PRIMARY KEY,
+    customer_id VARCHAR(20),
+    plan VARCHAR(30),
+    call_minutes INT,
+    sms_count INT,
+    data_gb DECIMAL(10,2),
+    usage_date DATE,
+    circle VARCHAR(50)
+);
+```
+
+Check:
+
+```sql
+DESC customer_usage;
+```
+
+Expected:
+
+```text
+| Field        | Type         |
+| usage_id     | int          |
+| customer_id  | varchar(20)  |
+| plan         | varchar(30)  |
+| call_minutes | int          |
+| sms_count    | int          |
+| data_gb      | decimal(...) |
+| usage_date   | date         |
+| circle       | varchar(50)  |
+```
+
+---
+
+# PART 7 — INSERT TELECOM DATA
+
+Insert:
+
+```sql
+INSERT INTO customer_usage VALUES
+(1,'C101','Premium',120,50,8.50,'2026-09-28','Karnataka'),
+(2,'C102','Basic',45,20,2.30,'2026-09-28','Maharashtra'),
+(3,'C103','Premium',200,75,15.20,'2026-09-28','Delhi'),
+(4,'C104','Standard',80,30,5.60,'2026-09-28','Karnataka'),
+(5,'C105','Basic',35,15,1.80,'2026-09-28','Tamil Nadu'),
+(6,'C101','Premium',150,60,10.20,'2026-09-28','Karnataka'),
+(7,'C102','Basic',55,25,3.10,'2026-09-28','Maharashtra'),
+(8,'C106','Standard',90,40,6.40,'2026-09-28','Telangana'),
+(9,'C107','Premium',180,80,14.50,'2026-09-28','Delhi'),
+(10,'C108','Basic',40,18,2.00,'2026-09-28','Kerala');
+```
+
+Verify:
+
+```sql
+SELECT * FROM customer_usage;
+```
+
+Expected:
+
+```text
+1   C101   Premium    120   50   8.50   2026-09-28   Karnataka
+2   C102   Basic       45   20   2.30   2026-09-28   Maharashtra
+3   C103   Premium    200   75  15.20   2026-09-28   Delhi
+...
+```
+
+Exit:
+
+```sql
+exit;
+```
+
+---
+
+# PART 8 — CREATE SQOOP USER
+
+Enter:
+
+```bash
+sudo mysql
+```
+
+Run:
+
+```sql
+CREATE USER 'sqoop_user'@'localhost'
+IDENTIFIED BY 'sqoop123';
+
+GRANT SELECT ON telecom_db.*
+TO 'sqoop_user'@'localhost';
+
+FLUSH PRIVILEGES;
+
+exit;
+```
+
+Test:
+
+```bash
+mysql -u sqoop_user -p
+```
+
+Password:
+
+```text
+sqoop123
+```
+
+Then:
+
+```sql
+USE telecom_db;
+
+SELECT COUNT(*) FROM customer_usage;
+```
+
+Expected:
+
+```text
++----------+
+| COUNT(*) |
++----------+
+|       10 |
++----------+
+```
+
+Exit:
+
+```sql
+exit;
+```
+
+---
+
+# PART 9 — INSTALL SQOOP
+
+Sqoop is a legacy Apache project and is retired, so this is best treated as a training/lab project, not a recommendation for a new production system. Its 1.4.7 documentation describes importing relational database tables into HDFS and using JDBC drivers. 
+
+Go to downloads:
+
+```bash
+cd ~/downloads
+```
+
+If directory does not exist:
+
+```bash
+mkdir -p ~/downloads
+cd ~/downloads
+```
+
+Download:
+
+```bash
+wget -4 https://archive.apache.org/dist/sqoop/1.4.7/sqoop-1.4.7.bin__hadoop-2.6.0.tar.gz
+```
+
+Extract:
+
+```bash
+tar -xzf sqoop-1.4.7.bin__hadoop-2.6.0.tar.gz
+```
+
+Move:
+
+```bash
+sudo mv sqoop-1.4.7.bin__hadoop-2.6.0 /usr/local/sqoop
+```
+
+Ownership:
+
+```bash
+sudo chown -R $USER:$USER /usr/local/sqoop
+```
+
+---
+
+# PART 10 — CONFIGURE SQOOP
+
+Open:
+
+```bash
+nano ~/.bashrc
+```
+
+Add:
+
+```bash
+export SQOOP_HOME=/usr/local/sqoop
+export PATH=$SQOOP_HOME/bin:$PATH
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+```
+
+Save.
+
+Then:
+
+```bash
+source ~/.bashrc
+```
+
+Check:
+
+```bash
+echo $SQOOP_HOME
+```
+
+Expected:
+
+```text
+/usr/local/sqoop
+```
+
+Check:
+
+```bash
+which sqoop
+```
+
+Expected:
+
+```text
+/usr/local/sqoop/bin/sqoop
+```
+
+---
+
+# PART 11 — INSTALL MYSQL JDBC DRIVER
+
+Sqoop needs the MySQL JDBC driver in its `lib` directory. Apache's Sqoop guide specifically documents installing the database JDBC driver in `$SQOOP_HOME/lib`. 
+
+Create:
+
+```bash
+mkdir -p ~/downloads/mysql-driver
+cd ~/downloads/mysql-driver
+```
+
+Download:
+
+```bash
+wget -4 https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/8.0.33/mysql-connector-j-8.0.33.jar
+```
+
+Copy:
+
+```bash
+cp mysql-connector-j-8.0.33.jar $SQOOP_HOME/lib/
+```
+
+Verify:
+
+```bash
+ls $SQOOP_HOME/lib | grep mysql
+```
+
+Expected:
+
+```text
+mysql-connector-j-8.0.33.jar
+```
+
+---
+
+# PART 12 — TEST SQOOP
+
+Run:
+
+```bash
+sqoop version
+```
+
+Expected:
+
+```text
+Sqoop 1.4.7
+```
+
+Test MySQL connection:
+
+```bash
+sqoop list-tables \
+--connect jdbc:mysql://localhost:3306/telecom_db \
+--username sqoop_user \
+--password sqoop123
+```
+
+Expected:
+
+```text
+customer_usage
+```
+
+If this works, Sqoop is correctly communicating with MySQL.
+
+---
+
+# PART 13 — CREATE HDFS DIRECTORIES
+
+Create project directories:
+
+```bash
+hdfs dfs -mkdir -p /telecom/raw
+hdfs dfs -mkdir -p /telecom/transformed
+hdfs dfs -mkdir -p /telecom/output
+```
+
+Check:
+
+```bash
+hdfs dfs -ls -R /telecom
+```
+
+Expected:
+
+```text
+/telecom/raw
+/telecom/transformed
+/telecom/output
+```
+
+---
+
+# PART 14 — TEST SQOOP MANUALLY
+
+Before Airflow, always test the actual extraction command.
+
+Run:
+
+```bash
+sqoop import \
+--connect jdbc:mysql://localhost:3306/telecom_db \
+--username sqoop_user \
+--password sqoop123 \
+--table customer_usage \
+--target-dir /telecom/raw/customer_usage \
+--fields-terminated-by ',' \
+--m 1
+```
+
+Expected output contains:
+
+```text
+Starting import job
+...
+MapReduce Job Launched
+...
+Import finished successfully
+```
+
+Check HDFS:
+
+```bash
+hdfs dfs -ls /telecom/raw/customer_usage
+```
+
+Expected:
+
+```text
+_SUCCESS
+part-m-00000
+```
+
+Read:
+
+```bash
+hdfs dfs -cat /telecom/raw/customer_usage/part-m-00000
+```
+
+Expected:
+
+```text
+1,C101,Premium,120,50,8.50,2026-09-28,Karnataka
+2,C102,Basic,45,20,2.30,2026-09-28,Maharashtra
+3,C103,Premium,200,75,15.20,2026-09-28,Delhi
+...
+```
+
+If this works, extraction is complete.
+
+Delete the test data:
+
+```bash
+hdfs dfs -rm -r /telecom/raw/customer_usage
+```
+
+We will let Airflow perform this step later.
+
+---
+
+# PART 15 — CHECK HIVE
+
+Check:
+
+```bash
+hive --version
+```
+
+Expected:
+
+```text
+Hive 3.1.3
+```
+
+If Hive is already working, do not reinstall it.
+
+If not installed:
+
+```bash
+cd ~/downloads
+```
+
+Download:
+
+```bash
+wget -4 https://archive.apache.org/dist/hive/hive-3.1.3/apache-hive-3.1.3-bin.tar.gz
+```
+
+Extract:
+
+```bash
+tar -xzf apache-hive-3.1.3-bin.tar.gz
+```
+
+Move:
+
+```bash
+sudo mv apache-hive-3.1.3-bin /usr/local/hive
+```
+
+Ownership:
+
+```bash
+sudo chown -R $USER:$USER /usr/local/hive
+```
+
+Add environment:
+
+```bash
+nano ~/.bashrc
+```
+
+Add:
+
+```bash
+export HIVE_HOME=/usr/local/hive
+export PATH=$HIVE_HOME/bin:$PATH
+```
+
+Then:
+
+```bash
+source ~/.bashrc
+```
+
+Check:
+
+```bash
+hive --version
+```
+
+---
+
+# PART 16 — CREATE HIVE DIRECTORIES
+
+Run:
+
+```bash
+hdfs dfs -mkdir -p /tmp
+hdfs dfs -mkdir -p /user/hive/warehouse
+```
+
+Permissions:
+
+```bash
+hdfs dfs -chmod 1777 /tmp
+hdfs dfs -chmod 777 /user/hive/warehouse
+```
+
+---
+
+# PART 17 — CREATE HIVE DATABASE
+
+Run:
+
+```bash
+hive
+```
+
+Then:
+
+```sql
+CREATE DATABASE IF NOT EXISTS telecom_dw;
+```
+
+Expected:
+
+```text
+OK
+```
+
+Exit:
+
+```sql
+exit;
+```
+
+---
+
+# PART 18 — CREATE PROJECT DIRECTORY
+
+Now create the Airflow project:
+
+```bash
+mkdir -p ~/telecom-etl
+mkdir -p ~/telecom-etl/incoming
+mkdir -p ~/telecom-etl/config
+mkdir -p ~/telecom-etl/scripts
+```
+
+Check:
+
+```bash
+tree ~/telecom-etl
+```
+
+If `tree` is not installed:
+
+```bash
+sudo apt install tree -y
+```
+
+Expected:
+
+```text
+telecom-etl
+├── config
+├── incoming
+└── scripts
+```
+
+---
+
+# PART 19 — CREATE READY FILE
+
+This file will simulate the upstream telecom application saying:
+
+> "Today's usage data is ready."
+
+Create:
+
+```bash
+touch ~/telecom-etl/incoming/usage.ready
+```
+
+Check:
+
+```bash
+ls -l ~/telecom-etl/incoming
+```
+
+Expected:
+
+```text
+usage.ready
+```
+
+Later we will delete this file to demonstrate the Sensor.
+
+---
+
+# PART 20 — CREATE PASSWORD FILE
+
+Create:
+
+```bash
+nano ~/telecom-etl/config/mysql.password
+```
+
+Enter:
+
+```text
+sqoop123
+```
+
+Save.
+
+Permission:
+
+```bash
+chmod 600 ~/telecom-etl/config/mysql.password
+```
+
+Check:
+
+```bash
+ls -l ~/telecom-etl/config/mysql.password
+```
+
+Expected:
+
+```text
+-rw------- ... mysql.password
+```
+
+---
+
+# PART 21 — CREATE HIVE TRANSFORMATION SCRIPT
+
+Create:
+
+```bash
+nano ~/telecom-etl/scripts/telecom_transform.sql
+```
+
+Enter:
+
+```sql
+CREATE DATABASE IF NOT EXISTS telecom_dw;
+
+DROP TABLE IF EXISTS telecom_dw.customer_usage_raw;
+
+CREATE EXTERNAL TABLE telecom_dw.customer_usage_raw (
+    usage_id INT,
+    customer_id STRING,
+    plan STRING,
+    call_minutes INT,
+    sms_count INT,
+    data_gb DECIMAL(10,2),
+    usage_date DATE,
+    circle STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/telecom/raw/customer_usage';
+
+DROP TABLE IF EXISTS telecom_dw.customer_usage_fact;
+
+CREATE TABLE telecom_dw.customer_usage_fact AS
+SELECT
+    usage_id,
+    customer_id,
+    UPPER(plan) AS plan,
+    call_minutes,
+    sms_count,
+    data_gb,
+    call_minutes * 1.0 AS call_usage_score,
+    usage_date,
+    UPPER(circle) AS circle
+FROM telecom_dw.customer_usage_raw
+WHERE call_minutes >= 0
+  AND sms_count >= 0
+  AND data_gb >= 0;
+
+DROP TABLE IF EXISTS telecom_dw.customer_usage_summary;
+
+CREATE TABLE telecom_dw.customer_usage_summary AS
+SELECT
+    customer_id,
+    MAX(plan) AS plan,
+    SUM(call_minutes) AS total_call_minutes,
+    SUM(sms_count) AS total_sms,
+    SUM(data_gb) AS total_data_gb
+FROM telecom_dw.customer_usage_fact
+GROUP BY customer_id;
+```
+
+Save.
+
+---
+
+# PART 22 — TEST HIVE TRANSFORMATION MANUALLY
+
+First run Sqoop again:
+
+```bash
+sqoop import \
+--connect jdbc:mysql://localhost:3306/telecom_db \
+--username sqoop_user \
+--password sqoop123 \
+--table customer_usage \
+--target-dir /telecom/raw/customer_usage \
+--fields-terminated-by ',' \
+--m 1
+```
+
+Then:
+
+```bash
+hive -f ~/telecom-etl/scripts/telecom_transform.sql
+```
+
+Expected:
+
+```text
+OK
+Time taken: ...
+```
+
+Open Hive:
+
+```bash
+hive
+```
+
+Run:
+
+```sql
+USE telecom_dw;
+```
+
+Check tables:
+
+```sql
+SHOW TABLES;
+```
+
+Expected:
+
+```text
+customer_usage_fact
+customer_usage_raw
+customer_usage_summary
+```
+
+Check:
+
+```sql
+SELECT * FROM customer_usage_summary;
+```
+
+Expected approximately:
+
+```text
+C101    PREMIUM    270    110    18.70
+C102    BASIC      100     45     5.40
+C103    PREMIUM    200     75    15.20
+C104    STANDARD    80     30     5.60
+C105    BASIC       35     15     1.80
+C106    STANDARD    90     40     6.40
+C107    PREMIUM    180     80    14.50
+C108    BASIC       40     18     2.00
+```
+
+Exit:
+
+```sql
+exit;
+```
+
+Delete the test HDFS data:
+
+```bash
+hdfs dfs -rm -r /telecom/raw/customer_usage
+```
+
+---
+
+# PART 23 — INSTALL AIRFLOW
+
+This is the most important installation section.
+
+// Why a virtual environment?
+
+Do not install Airflow into the system Python.
+
+Apache currently recommends a Python environment and constraints-based installation for a reproducible installation. Airflow 3.3.2 supports Python 3.10–3.14. ([Apache Airflow][1])
+
+Check:
+
+```bash
+python3 --version
+```
+
+Expected on your Ubuntu 24.04:
+
+```text
+Python 3.12.x
+```
+
+Install required packages:
+
+```bash
+sudo apt update
+sudo apt install python3-pip python3-venv -y
+```
+
+---
+
+# PART 24 — CREATE AIRFLOW VIRTUAL ENVIRONMENT
+
+Create:
+
+```bash
+python3 -m venv ~/airflow-venv
+```
+
+Activate:
+
+```bash
+source ~/airflow-venv/bin/activate
+```
+
+Your prompt should change approximately to:
+
+```text
+(airflow-venv) sari@DESKTOP-CQEJB26:~$
+```
+
+Check:
+
+```bash
+python --version
+```
+
+Expected:
+
+```text
+Python 3.12.x
+```
+
+---
+
+# PART 25 — INSTALL AIRFLOW 3.3.2
+
+Set:
+
+```bash
+export AIRFLOW_VERSION=3.3.2
+```
+
+Check Python version:
+
+```bash
+export PYTHON_VERSION="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+```
+
+Check:
+
+```bash
+echo $PYTHON_VERSION
+```
+
+Expected:
+
+```text
+3.12
+```
+
+Create constraints URL:
+
+```bash
+export CONSTRAINT_URL="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+```
+
+Install:
+
+```bash
+pip install "apache-airflow==${AIRFLOW_VERSION}" \
+--constraint "${CONSTRAINT_URL}"
+```
+
+This is the current Apache-documented constraints approach. ([Apache Airflow][3])
+
+Check:
+
+```bash
+airflow version
+```
+
+Expected:
+
+```text
+3.3.2
+```
+
+---
+
+# PART 26 — INSTALL AIRFLOW STANDARD PROVIDER
+
+The standard provider contains commonly used operators and sensors such as `BashOperator`, `PythonOperator` and `FileSensor`. ([Apache Airflow][4])
+
+Run:
+
+```bash
+pip install apache-airflow-providers-standard
+```
+
+Check:
+
+```bash
+pip check
+```
+
+Expected:
+
+```text
+No broken requirements found.
+```
+
+---
+
+# PART 27 — SET AIRFLOW HOME
+
+Run:
+
+```bash
+export AIRFLOW_HOME=~/airflow
+```
+
+Check:
+
+```bash
+echo $AIRFLOW_HOME
+```
+
+Expected:
+
+```text
+/home/sari/airflow
+```
+
+To make it permanent:
+
+```bash
+nano ~/.bashrc
+```
+
+Add:
+
+```bash
+export AIRFLOW_HOME=~/airflow
+```
+
+Save:
+
+```bash
+source ~/.bashrc
+```
+
+---
+
+# PART 28 — INITIALIZE AIRFLOW DATABASE
+
+Run:
+
+```bash
+airflow db migrate
+```
+
+Expected output will contain database migration messages and finish successfully.
+
+Airflow requires its metadata database to be initialized/migrated before running the components. ([Apache Airflow][5])
+
+---
+
+# PART 29 — START AIRFLOW
+
+For this student lab, use:
+
+```bash
+airflow standalone
+```
+
+Airflow's standalone mode is intended for local development/testing rather than production. It starts the local components and generates the local admin credentials. ([Apache Airflow][5])
+
+You should see messages indicating that Airflow has started.
+
+Open Windows browser:
+
+```text
+http://localhost:8080
+```
+
+---
+
+# PART 30 — AIRFLOW LOGIN
+
+Airflow will generate a password file.
+
+In another WSL terminal:
+
+```bash
+cat ~/airflow/simple_auth_manager_passwords.json.generated
+```
+
+Use the displayed password to log into:
+
+```text
+http://localhost:8080
+```
+
+---
+
+# PART 31 — CREATE AIRFLOW CONNECTION
+
+This is where we teach Connection + Hook.
+
+Our local folder:
+
+```text
+/home/sari/telecom-etl/incoming
+```
+
+Airflow Connection:
+
+```text
+Connection ID = telecom_files
+Connection Type = File (path)
+Path = /home/sari/telecom-etl/incoming
+```
+
+Run:
+
+```bash
+airflow connections add telecom_files \
+--conn-type fs \
+--conn-extra '{"path":"/home/sari/telecom-etl/incoming"}'
+```
+
+Check:
+
+```bash
+airflow connections get telecom_files
+```
+
+Expected to show:
+
+```text
+telecom_files
+fs
+```
+
+The current FileSensor uses an `fs_conn_id` and interprets `filepath` relative to the base path in that filesystem connection. ([Apache Airflow][6])
+
+---
+
+# PART 32 — UNDERSTAND CONNECTION + HOOK
+
+We have:
+
+```text
+Airflow Connection
+        |
+        | telecom_files
+        v
+      FSHook
+        |
+        v
+/home/sari/telecom-etl/incoming
+```
+
+The Hook allows Python code to access the connection information.
+
+Our DAG will contain:
+
+```python
+hook = FSHook(fs_conn_id="telecom_files")
+```
+
+Then:
+
+```python
+base_path = hook.get_path()
+```
+
+---
+
+# PART 33 — CREATE DAG DIRECTORY
+
+Check:
+
+```bash
+mkdir -p ~/airflow/dags
+```
+
+Check:
+
+```bash
+ls ~/airflow/dags
+```
+
+---
+
+# PART 34 — CREATE THE COMPLETE DAG
+
+Create:
+
+```bash
+nano ~/airflow/dags/telecom_customer_usage_etl.py
+```
+
+Paste:
+
+```python
+from datetime import datetime, timedelta
+import os
+
+from airflow.sdk import DAG
+
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.standard.sensors.filesystem import FileSensor
+from airflow.providers.standard.hooks.filesystem import FSHook
+
+
+PROJECT_HOME = "/home/sari/telecom-etl"
+
+READY_FILE = "usage.ready"
+
+PASSWORD_FILE = (
+    f"{PROJECT_HOME}/config/mysql.password"
+)
+
+
+def verify_ready_file():
+
+    hook = FSHook(
+        fs_conn_id="telecom_files"
+    )
+
+    base_path = hook.get_path()
+
+    ready_path = os.path.join(
+        base_path,
+        READY_FILE
+    )
+
+    print("Filesystem path:", base_path)
+    print("Checking file:", ready_path)
+
+    if not os.path.isfile(ready_path):
+        raise FileNotFoundError(
+            f"Ready file not found: {ready_path}"
+        )
+
+    print("READY FILE FOUND")
+    print("Telecom usage data is ready.")
+
+
+with DAG(
+
+    dag_id="telecom_customer_usage_etl",
+
+    start_date=datetime(
+        2026,
+        9,
+        1
+    ),
+
+    schedule="0 2 * * *",
+
+    catchup=False,
+
+    default_args={
+
+        "owner": "data_engineering",
+
+        "retries": 2,
+
+        "retry_delay": timedelta(
+            minutes=2
+        ),
+    },
+
+    tags=[
+        "telecom",
+        "etl",
+        "sqoop",
+        "hdfs",
+        "hive"
+    ],
+
+) as dag:
+
+
+    wait_for_ready_file = FileSensor(
+
+        task_id="wait_for_usage_ready_file",
+
+        filepath=READY_FILE,
+
+        fs_conn_id="telecom_files",
+
+        poke_interval=30,
+
+        timeout=30 * 60,
+
+        mode="reschedule",
+    )
+
+
+    verify_file = PythonOperator(
+
+        task_id="verify_file_using_hook",
+
+        python_callable=verify_ready_file,
+
+    )
+
+
+    sqoop_extract = BashOperator(
+
+        task_id="sqoop_extract_mysql_to_hdfs",
+
+        bash_command=f"""
+
+        echo "================================="
+        echo "Starting Sqoop Extraction"
+        echo "================================="
+
+        hdfs dfs -rm -r -f \
+        /telecom/raw/customer_usage
+
+        sqoop import \\
+        --connect jdbc:mysql://localhost:3306/telecom_db \\
+        --username sqoop_user \\
+        --password-file file://{PASSWORD_FILE} \\
+        --table customer_usage \\
+        --target-dir /telecom/raw/customer_usage \\
+        --fields-terminated-by ',' \\
+        --m 1
+
+        echo "Sqoop extraction completed."
+
+        echo "HDFS output:"
+
+        hdfs dfs -ls \
+        /telecom/raw/customer_usage
+
+        """,
+    )
+
+
+    hive_transform = BashOperator(
+
+        task_id="hive_transform_and_load",
+
+        bash_command=f"""
+
+        echo "================================="
+        echo "Starting Hive Transformation"
+        echo "================================="
+
+        hive -f \
+        {PROJECT_HOME}/scripts/telecom_transform.sql
+
+        echo "Hive transformation completed."
+
+        """,
+    )
+
+
+    usage_summary = BashOperator(
+
+        task_id="generate_usage_summary",
+
+        bash_command="""
+
+        echo "================================="
+        echo "Customer Usage Summary"
+        echo "================================="
+
+        hive -e "
+
+        USE telecom_dw;
+
+        SELECT
+            customer_id,
+            plan,
+            total_call_minutes,
+            total_sms,
+            total_data_gb
+
+        FROM customer_usage_summary
+
+        ORDER BY total_data_gb DESC;
+
+        "
+
+        """,
+    )
+
+
+    pipeline_complete = BashOperator(
+
+        task_id="pipeline_complete",
+
+        bash_command="""
+
+        echo "======================================"
+        echo " TELECOM ETL PIPELINE COMPLETED"
+        echo "======================================"
+
+        """,
+    )
+
+
+    wait_for_ready_file \
+        >> verify_file \
+        >> sqoop_extract \
+        >> hive_transform \
+        >> usage_summary \
+        >> pipeline_complete
+```
+
+---
+
+# PART 35 — UNDERSTAND THE DAG
+
+The workflow is:
+
+```text
+wait_for_usage_ready_file
+          |
+          v
+verify_file_using_hook
+          |
+          v
+sqoop_extract_mysql_to_hdfs
+          |
+          v
+hive_transform_and_load
+          |
+          v
+generate_usage_summary
+          |
+          v
+pipeline_complete
+```
+
+---
+
+# PART 36 — CRON EXPLANATION
+
+This line:
+
+```python
+schedule="0 2 * * *"
+```
+
+means:
+
+```text
+0  2  *  *  *
+|  |  |  |  |
+|  |  |  |  +---- Day of week
+|  |  |  +------- Month
+|  |  +---------- Day
+|  +------------- Hour
++---------------- Minute
+```
+
+Therefore:
+
+```text
+Every day at 2:00 AM
+```
+
+Interview answer:
+
+> "I scheduled my telecom ETL DAG to run every day at 2 AM using the cron expression `0 2 * * *`."
+
+---
+
+# PART 37 — UNDERSTAND THE SENSOR
+
+This:
+
+```python
+FileSensor(
+    task_id="wait_for_usage_ready_file",
+    filepath="usage.ready",
+    fs_conn_id="telecom_files",
+)
+```
+
+means:
+
+```text
+Airflow
+   |
+   v
+Check usage.ready
+   |
+   +---- NO ----> Wait 30 seconds
+   |                    |
+   |                    v
+   |              Check again
+   |
+   +---- YES ---> Continue
+```
+
+Airflow's current standard provider provides `FileSensor` specifically for waiting for a file/folder to appear in a filesystem. ([Apache Airflow][6])
+
+---
+
+# PART 38 — TEST DAG SYNTAX
+
+Activate Airflow environment if needed:
+
+```bash
+source ~/airflow-venv/bin/activate
+```
+
+Run:
+
+```bash
+python ~/airflow/dags/telecom_customer_usage_etl.py
+```
+
+There should be no Python traceback.
+
+Then:
+
+```bash
+airflow dags list | grep telecom
+```
+
+Expected:
+
+```text
+telecom_customer_usage_etl
+```
+
+---
+
+# PART 39 — CHECK TASKS
+
+Run:
+
+```bash
+airflow tasks list telecom_customer_usage_etl
+```
+
+Expected approximately:
+
+```text
+generate_usage_summary
+hive_transform_and_load
+pipeline_complete
+sqoop_extract_mysql_to_hdfs
+verify_file_using_hook
+wait_for_usage_ready_file
+```
+
+---
+
+# PART 40 — SHOW DAG STRUCTURE
+
+Run:
+
+```bash
+airflow dags show telecom_customer_usage_etl
+```
+
+Conceptually:
+
+```text
+wait_for_usage_ready_file
+          |
+          v
+verify_file_using_hook
+          |
+          v
+sqoop_extract_mysql_to_hdfs
+          |
+          v
+hive_transform_and_load
+          |
+          v
+generate_usage_summary
+          |
+          v
+pipeline_complete
+```
+
+---
+
+# PART 41 — TEST SENSOR PROPERLY
+
+This is an important classroom demonstration.
+
+Delete the ready file:
+
+```bash
+rm ~/telecom-etl/incoming/usage.ready
+```
+
+Verify:
+
+```bash
+ls -l ~/telecom-etl/incoming
+```
+
+It should be empty.
+
+---
+
+# PART 42 — TRIGGER DAG FROM UI
+
+Open:
+
+```text
+http://localhost:8080
+```
+
+Find:
+
+```text
+telecom_customer_usage_etl
+```
+
+Trigger the DAG manually.
+
+The first task:
+
+```text
+wait_for_usage_ready_file
+```
+
+will wait.
+
+The DAG should not proceed to Sqoop because:
+
+```text
+usage.ready
+```
+
+does not exist.
+
+---
+
+# PART 43 — SIMULATE UPSTREAM SYSTEM
+
+In another WSL terminal:
+
+```bash
+touch ~/telecom-etl/incoming/usage.ready
+```
+
+Check:
+
+```bash
+ls -l ~/telecom-etl/incoming
+```
+
+Expected:
+
+```text
+usage.ready
+```
+
+The Sensor detects the file.
+
+Then the DAG proceeds:
+
+```text
+Sensor
+  ↓
+Hook
+  ↓
+Sqoop
+  ↓
+Hive
+  ↓
+Summary
+```
+
+---
+
+# PART 44 — EXPECTED AIRFLOW TASK RESULTS
+
+In Airflow UI:
+
+```text
+wait_for_usage_ready_file       SUCCESS
+             ↓
+verify_file_using_hook          SUCCESS
+             ↓
+sqoop_extract_mysql_to_hdfs     SUCCESS
+             ↓
+hive_transform_and_load         SUCCESS
+             ↓
+generate_usage_summary          SUCCESS
+             ↓
+pipeline_complete               SUCCESS
+```
+
+All tasks should complete successfully.
+
+---
+
+# PART 45 — VERIFY SQOOP OUTPUT
+
+Run:
+
+```bash
+hdfs dfs -ls /telecom/raw/customer_usage
+```
+
+Expected:
+
+```text
+_SUCCESS
+part-m-00000
+```
+
+Read:
+
+```bash
+hdfs dfs -cat /telecom/raw/customer_usage/part-m-00000
+```
+
+Expected:
+
+```text
+1,C101,Premium,120,50,8.50,2026-09-28,Karnataka
+2,C102,Basic,45,20,2.30,2026-09-28,Maharashtra
+3,C103,Premium,200,75,15.20,2026-09-28,Delhi
+...
+```
+
+---
+
+# PART 46 — VERIFY HIVE
+
+Run:
+
+```bash
+hive
+```
+
+Then:
+
+```sql
+USE telecom_dw;
+```
+
+Check:
+
+```sql
+SHOW TABLES;
+```
+
+Expected:
+
+```text
+customer_usage_fact
+customer_usage_raw
+customer_usage_summary
+```
+
+Run:
+
+```sql
+SELECT * FROM customer_usage_fact;
+```
+
+Then:
+
+```sql
+SELECT * FROM customer_usage_summary;
+```
+
+Expected:
+
+```text
+C101   PREMIUM   270   110   18.70
+C102   BASIC     100    45    5.40
+C103   PREMIUM   200    75   15.20
+C104   STANDARD   80    30    5.60
+C105   BASIC      35    15    1.80
+C106   STANDARD   90    40    6.40
+C107   PREMIUM    180    80   14.50
+C108   BASIC       40    18    2.00
+```
+
+---
+
+# PART 47 — VERIFY BUSINESS RESULT
+
+Run:
+
+```sql
+SELECT
+    customer_id,
+    plan,
+    total_call_minutes,
+    total_sms,
+    total_data_gb
+FROM customer_usage_summary
+ORDER BY total_data_gb DESC;
+```
+
+Example:
+
+```text
+C103  PREMIUM   200  75  15.20
+C107  PREMIUM   180  80  14.50
+C101  PREMIUM   270 110  18.70
+...
+```
+
+The company now has a customer-level usage report.
+
+---
+
+# PART 48 — WHAT EACH TECHNOLOGY DOES
+
+This is extremely important for interviews.
+
+```text
+MySQL
+  ↓
+SOURCE DATABASE
+```
+
+MySQL stores the telecom operational data.
+
+```text
+Sqoop
+  ↓
+EXTRACTION
+```
+
+Sqoop moves relational data into Hadoop/HDFS. Apache's Sqoop documentation specifically describes importing database tables into HDFS and using JDBC drivers. 
+
+```text
+HDFS
+  ↓
+RAW STORAGE
+```
+
+HDFS stores the extracted raw data.
+
+```text
+Hive
+  ↓
+TRANSFORMATION
+```
+
+Hive performs SQL-based processing.
+
+```text
+Airflow
+  ↓
+ORCHESTRATION
+```
+
+Airflow controls when and in what order everything happens.
+
+```text
+Cron
+  ↓
+SCHEDULING
+```
+
+Cron expression says when the DAG is scheduled.
+
+```text
+Sensor
+  ↓
+WAIT
+```
+
+Sensor waits for `usage.ready`.
+
+```text
+Hook
+  ↓
+CONNECTION
+```
+
+Hook accesses the configured filesystem connection.
+
+---
+
+# PART 49 — COMPLETE END-TO-END FLOW
+
+Students should draw this in an interview:
+
+```text
+                    TELECOM APPLICATION
+                            |
+                            |
+                       MySQL Database
+                            |
+                            |
+                          Sqoop
+                            |
+                            |
+                            v
+                    +---------------+
+                    |     HDFS      |
+                    |   RAW DATA    |
+                    +---------------+
+                            |
+                            |
+                       Hive External
+                          Table
+                            |
+                            v
+                     Hive Transform
+                            |
+                            v
+                   customer_usage_fact
+                            |
+                            v
+                 customer_usage_summary
+                            |
+                            v
+                         REPORT
+```
+
+Airflow sits above the pipeline:
+
+```text
+                       AIRFLOW
+                          |
+                       CRON
+                          |
+                          v
+                       SENSOR
+                          |
+                          v
+                        HOOK
+                          |
+                          v
+                        SQOOP
+                          |
+                          v
+                         HIVE
+                          |
+                          v
+                        REPORT
+```
+
+---
+
+# PART 50 — WHAT HAPPENS IF THE FILE DOES NOT ARRIVE?
+
+Suppose:
+
+```text
+usage.ready
+```
+
+never arrives.
+
+The Sensor:
+
+```text
+wait_for_usage_ready_file
+```
+
+keeps checking.
+
+We configured:
+
+```python
+poke_interval=30
+```
+
+So it checks approximately every:
+
+```text
+30 seconds
+```
+
+We configured:
+
+```python
+timeout=30 * 60
+```
+
+So it waits for up to:
+
+```text
+30 minutes
+```
+
+Then it fails.
+
+Most importantly:
+
+```text
+Sensor FAILED
+      |
+      X
+    Sqoop
+```
+
+Sqoop does not start.
+
+---
+
+# PART 51 — WHAT HAPPENS IF SQOOP FAILS?
+
+We configured:
+
+```python
+"retries": 2
+```
+
+and:
+
+```python
+"retry_delay": timedelta(minutes=2)
+```
+
+So:
+
+```text
+Sqoop
+  |
+FAIL
+  |
+Wait 2 minutes
+  |
+Retry 1
+  |
+FAIL
+  |
+Wait 2 minutes
+  |
+Retry 2
+  |
+SUCCESS / FAILED
+```
+
+If it finally fails:
+
+```text
+Sqoop FAILED
+     |
+     X
+Hive
+```
+
+Downstream tasks don't proceed normally.
+
+---
+
+# PART 52 — WHY NOT JUST USE LINUX CRON?
+
+Important interview question.
+
+// Linux cron
+
+```text
+cron
+ ↓
+shell script
+```
+
+It can schedule a command.
+
+But Airflow provides much more:
+
+```text
+Airflow
+ |
+ +-- DAG
+ +-- Dependencies
+ +-- Sensors
+ +-- Hooks
+ +-- Retries
+ +-- Logs
+ +-- Monitoring
+ +-- UI
+ +-- Task status
+```
+
+So:
+
+> Cron tells us when something should run; Airflow manages the complete workflow.
+
+In this project, the cron expression is part of the Airflow DAG schedule.
+
+---
+
+# PART 53 — WHY USE AIRFLOW IF SQOOP AND HIVE ALREADY WORK?
+
+This is another important interview question.
+
+Without Airflow:
+
+```text
+Manually run Sqoop
+        ↓
+Check output
+        ↓
+Run Hive
+        ↓
+Check output
+        ↓
+Generate report
+```
+
+With Airflow:
+
+```text
+Schedule
+   ↓
+Wait
+   ↓
+Validate
+   ↓
+Extract
+   ↓
+Transform
+   ↓
+Report
+```
+
+Airflow provides orchestration, dependency management, retries and monitoring.
+
+---
+
+# PART 54 — WHY USE HDFS?
+
+Answer:
+
+> "HDFS provides the raw data storage layer. I keep the original extracted telecom data in HDFS before transformation so that the raw dataset can be retained and reprocessed if required."
+
+---
+
+# PART 55 — WHY USE HIVE?
+
+Answer:
+
+> "Hive provides a SQL interface for transforming and aggregating the HDFS data. In this project I use Hive to create the raw external table, fact table and customer usage summary."
+
+---
+
+# PART 56 — WHY USE SQOOP?
+
+Answer:
+
+> "The source data is in a relational MySQL database, while our Hadoop processing environment uses HDFS. Sqoop was designed to perform bulk transfer between relational databases and Hadoop, so it is used for the extraction stage."
+
+---
+
+# PART 57 — WHY USE A SENSOR?
+
+Answer:
+
+> "The telecom source system may finish at different times each day. Instead of starting Sqoop blindly, the FileSensor waits for the `usage.ready` file. Once the file appears, the extraction starts."
+
+---
+
+# PART 58 — WHY USE A HOOK?
+
+Answer:
+
+> "The Hook provides the programmatic interface to the external filesystem connection. My DAG uses FSHook to obtain the configured incoming directory and verify the ready file."
+
+---
+
+# PART 59 — SENSOR VS HOOK
+
+Students often confuse these.
+
+| Sensor                    | Hook                              
+| Waits for something       | Communicates with 				external system |
+| Checks condition          | Provides interface                
+
+| Example: file exists      | Example: filesystem 				connection    |
+| Controls workflow waiting | Helps access system               
+
+| `FileSensor`              | `FSHook`                          
+
+Simple memory:
+
+```text
+Sensor = WAIT
+
+Hook = CONNECT
+```
+
+---
+
+# PART 60 — COMPLETE PROJECT FOLDER
+
+Final local project:
+
+```text
+/home/sari/telecom-etl/
+
+├── incoming/
+│   └── usage.ready
+│
+├── config/
+│   └── mysql.password
+│
+└── scripts/
+    └── telecom_transform.sql
+```
+
+Airflow:
+
+```text
+/home/sari/airflow/
+
+└── dags/
+    └── telecom_customer_usage_etl.py
+```
+
+HDFS:
+
+```text
+/telecom/
+
+├── raw/
+│   └── customer_usage/
+│
+├── transformed/
+│
+└── output/
+```
+
+Hive:
+
+```text
+telecom_dw
+
+├── customer_usage_raw
+├── customer_usage_fact
+└── customer_usage_summary
+```
+
+---
+
+# PART 61 — FINAL PROJECT PRESENTATION
+
+Students can say:
+
+> "I developed an automated telecom customer usage ETL pipeline using MySQL, Sqoop, HDFS, Hive and Apache Airflow. MySQL acts as the source database containing daily customer usage information such as call minutes, SMS count, data usage, plan and telecom circle. Sqoop extracts the relational data into HDFS as the raw layer. Airflow schedules the pipeline daily at 2 AM using a cron expression. Before extraction, a FileSensor waits for a `usage.ready` file from the upstream application. I configured an Airflow filesystem Connection and used FSHook to verify the source-ready location. After the condition is satisfied, Airflow triggers Sqoop, followed by Hive transformation and customer-level aggregation. Airflow also handles task dependencies, retries, logging and monitoring through its UI."
+
+---
+
+# PART 62 — INTERVIEW QUESTIONS
+
+Students should prepare these.
+
+// ETL
+
+1. What is ETL?
+2. What is the Extract stage?
+3. What is the Transform stage?
+4. What is the Load stage?
+5. What is the difference between ETL and ELT?
+
+// Sqoop
+
+6. What is Sqoop?
+7. Why did you use Sqoop?
+8. What is Sqoop import?
+9. What is Sqoop export?
+10. Why do you need a JDBC driver?
+11. What is `--target-dir`?
+12. What is `--m 1`?
+13. Why does Sqoop create `part-m-00000`?
+14. How does Sqoop transfer MySQL data to HDFS?
+
+// HDFS
+
+15. Why did you use HDFS?
+16. What is the raw layer?
+17. Why retain raw data?
+18. What happens if the HDFS DataNode is unavailable?
+
+// Hive
+
+19. Why use Hive?
+20. What is an external table?
+21. Why use an external table for raw data?
+22. What is the difference between raw and fact tables?
+23. How did you calculate customer-level usage?
+24. How did you handle invalid records?
+
+// Airflow
+
+25. What is Airflow?
+26. What is a DAG?
+27. What is a task?
+28. What is an Operator?
+29. What is a Scheduler?
+30. What is a Sensor?
+31. What is a Hook?
+32. What is a Connection?
+33. What is a cron expression?
+34. What does `0 2 * * *` mean?
+35. How does Airflow handle failure?
+36. How do retries work?
+37. How do you monitor a DAG?
+38. How do you manually trigger a DAG?
+39. What happens when the ready file doesn't arrive?
+40. Why use `mode="reschedule"`?
+
+---
+
+# PART 63 — THE 10 MOST IMPORTANT ANSWERS TO MEMORIZE
+
+```text
+MySQL
+    ↓
+Source
+
+Sqoop
+    ↓
+Extract
+
+HDFS
+    ↓
+Raw storage
+
+Hive
+    ↓
+Transform + Load
+
+Airflow
+    ↓
+Orchestration
+
+Cron
+    ↓
+Schedule
+
+Sensor
+    ↓
+Wait for condition
+
+Hook
+    ↓
+Connect to external system
+
+Connection
+    ↓
+Store connection information
+
+DAG
+    ↓
+Define workflow and dependencies
+```
+
+// Final interview flow
+
+```text
+             CRON
+               |
+               v
+          AIRFLOW DAG
+               |
+               v
+            SENSOR
+               |
+       usage.ready?
+          /       \
+        NO         YES
+        |           |
+      WAIT         HOOK
+                    |
+                    v
+                  SQOOP
+                    |
+                    v
+                 MYSQL
+                    |
+                    v
+                  HDFS
+                    |
+                    v
+                  HIVE
+                    |
+                    v
+             TRANSFORMATION
+                    |
+                    v
+          CUSTOMER USAGE SUMMARY
+                    |
+                    v
+                 REPORT
+
+One compatibility note for your lab: current Airflow's HDFS provider uses WebHDFS-based hooks/sensors; the old `HDFSHook`/`HDFSSensor` were removed from provider 4.x. For this project I deliberately use the simpler local `FileSensor` + `FSHook`, which is officially provided by the Standard provider, so the Sensor/Hook demonstration does not depend on configuring WebHDFS. ([Apache Airflow][7])

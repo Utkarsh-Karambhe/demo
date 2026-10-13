@@ -1,0 +1,278 @@
+## USE CASE-1: Web Server HTTP Status Code Analysis
+
+```
+# Start Hadoop
+
+start-dfs.sh
+
+start-yarn.sh
+
+jps
+
+# If MapReduce is taking time or appears stuck:
+# Check YARN NodeManager
+
+yarn node -list
+
+# If it shows Total Nodes: 0
+
+rm -rf /home/ubuntu/.cache/*
+
+df -h /
+
+sudo du -xhd1 /var | sort -h
+
+stop-yarn.sh
+
+stop-dfs.sh
+
+# Start again
+
+start-dfs.sh
+
+start-yarn.sh
+
+jps
+```
+
+```
+# Create project directory
+
+cd ~
+
+mkdir -p web-log-mapreduce
+
+cd ~/web-log-mapreduce
+```
+
+```
+# Create input file
+
+nano web_logs.txt
+```
+
+```
+192.168.1.10 GET /home 200
+192.168.1.11 GET /login 200
+192.168.1.12 GET /product 404
+192.168.1.13 GET /home 200
+192.168.1.14 GET /checkout 500
+192.168.1.15 GET /product 404
+192.168.1.16 GET /home 200
+192.168.1.17 GET /server 500
+```
+
+```
+cat web_logs.txt
+```
+
+```
+# Create Mapper
+
+nano StatusCodeMapper.py
+```
+
+```
+#!/usr/bin/env python3
+
+import sys
+
+for line in sys.stdin:
+    parts = line.strip().split()
+
+    if len(parts) >= 4:
+        status_code = parts[3]
+        print(f"{status_code}\t1")
+```
+
+```
+# Create Combiner
+
+nano StatusCodeCombiner.py
+```
+
+```
+#!/usr/bin/env python3
+
+import sys
+
+current_key = None
+current_sum = 0
+
+for line in sys.stdin:
+    key, value = line.strip().split("\t")
+    value = int(value)
+
+    if current_key == key:
+        current_sum += value
+    else:
+        if current_key is not None:
+            print(f"{current_key}\t{current_sum}")
+
+        current_key = key
+        current_sum = value
+
+if current_key is not None:
+    print(f"{current_key}\t{current_sum}")
+```
+
+```
+# Create Reducer
+
+nano StatusCodeReducer.py
+```
+
+```
+#!/usr/bin/env python3
+
+import sys
+
+current_key = None
+current_sum = 0
+
+for line in sys.stdin:
+    key, value = line.strip().split("\t")
+    value = int(value)
+
+    if current_key == key:
+        current_sum += value
+    else:
+        if current_key is not None:
+            print(f"{current_key}\t{current_sum}")
+
+        current_key = key
+        current_sum = value
+
+if current_key is not None:
+    print(f"{current_key}\t{current_sum}")
+```
+
+```
+# Create Partitioner
+
+nano StatusCodePartitioner.py
+```
+
+```
+#!/usr/bin/env python3
+
+import sys
+
+for line in sys.stdin:
+    key, value = line.strip().split("\t")
+
+    status = int(key)
+
+    if 200 <= status < 300:
+        partition = 0
+    else:
+        partition = 1
+
+    print(f"{partition}\t{key}\t{value}")
+```
+
+```
+# Create Driver
+
+nano StatusCodeDriver.py
+```
+
+```
+#!/usr/bin/env python3
+
+import subprocess
+import sys
+
+input_path = sys.argv[1]
+output_path = sys.argv[2]
+
+streaming_jar = "/opt/hadoop/share/hadoop/tools/lib/hadoop-streaming-3.3.6.jar"
+
+subprocess.run([
+    "hadoop",
+    "jar",
+    streaming_jar,
+    "-input", input_path,
+    "-output", output_path,
+    "-mapper", "python3 StatusCodeMapper.py",
+    "-combiner", "python3 StatusCodeCombiner.py",
+    "-reducer", "python3 StatusCodeReducer.py",
+    "-file", "StatusCodeMapper.py",
+    "-file", "StatusCodeCombiner.py",
+    "-file", "StatusCodeReducer.py"
+], check=True)
+```
+
+```
+# Make Python files executable
+
+chmod +x StatusCodeMapper.py \
+StatusCodeCombiner.py \
+StatusCodeReducer.py \
+StatusCodePartitioner.py \
+StatusCodeDriver.py
+```
+
+```
+# Check files
+
+ls -lh
+
+find . -maxdepth 2 -type f | sort
+```
+
+```
+# Create HDFS input directory
+
+hdfs dfs -mkdir -p /user/$USER/web_logs/input
+```
+
+```
+# Upload input file to HDFS
+
+hdfs dfs -put -f web_logs.txt /user/$USER/web_logs/input/
+```
+
+```
+# Verify HDFS input
+
+hdfs dfs -ls /user/$USER/web_logs/input
+
+hdfs dfs -cat /user/$USER/web_logs/input/web_logs.txt
+```
+
+```
+# Remove previous output
+
+hdfs dfs -rm -r -f /user/$USER/web_logs/output
+```
+
+```
+# Run Python MapReduce
+
+python3 StatusCodeDriver.py \
+/user/$USER/web_logs/input \
+/user/$USER/web_logs/output
+```
+
+```
+# Check output
+
+hdfs dfs -ls /user/$USER/web_logs/output
+
+hdfs dfs -cat /user/$USER/web_logs/output/part-*
+```
+
+```
+Expected result:
+
+200     4
+404     2
+500     2
+```
+
+```
+# Optional: combine all reducer output into one view
+
+hdfs dfs -cat /user/$USER/web_logs/output/part-* | sort
+```

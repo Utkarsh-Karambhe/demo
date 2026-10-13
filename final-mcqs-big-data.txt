@@ -1,0 +1,1419 @@
+# Big Data Technologies: Final 50 Corporate Interview MCQs with Answers
+
+
+
+ 1. What was changed?
+
+| Area                 | Revision                                                                                           
+| HDFS                 | Retained block management, replication and upload commands; included safe mode troubleshooting     |
+| Hive                 | Separated partitioning from bucketing; added partition repair and file-format selection            |
+| Spark                | Distinguished caching, broadcast joins, data skew, small-file problems and execution-plan analysis |
+| Kafka                | Separated consumer-group scaling, consumer lag, duplicate processing and streaming watermarks      |
+| Airflow              | Retained DAGs, sensors and idempotency; added sensor resource management and secret handling       |
+| SQL and warehousing  | Added star schema, window functions, deduplication and query optimization                          |
+| Data quality         | Added invalid-record quarantine and validation scenarios                                           |
+| Data science         | Retained classification and overfitting; added imbalanced-data evaluation                          |
+| Cloud and production | Added resource scaling, cost control, JDBC limits and end-to-end pipeline design                   |
+
+ Section 1: Big Data fundamentals and ecosystem
+
+# Q1. A company collects website clicks, images, application logs, and customer transactions. Which Big Data characteristic describes the diversity of these formats?
+
+A. Volume B. Velocity C. Variety D. Veracity
+
+Correct answer: C. Variety
+
+Explanation: Variety refers to different data formats, including structured tables, semi-structured JSON and XML, and unstructured images, videos and text.
+
+# Q2. An organization must store 100 TB of historical data and run distributed batch processing across multiple machines. Which traditional Hadoop combination best fits this requirement?
+
+A. HDFS and MapReduce B. MySQL on one laptop C. Redis and browser storage D. HTML and CSS
+
+Correct answer: A. HDFS and MapReduce
+
+Explanation: HDFS distributes large files across cluster nodes, while MapReduce performs parallel batch processing. Modern platforms frequently use Spark for many batch workloads.
+
+# Q3. Which statement correctly describes the core Hadoop components?
+
+A. HDFS manages cluster resources, while YARN stores file blocks. B. HDFS stores distributed data, YARN manages cluster resources, and MapReduce executes distributed batch jobs. C. Hive manages Kafka partitions and offsets. D. MapReduce replaces the filesystem and resource manager.
+
+Correct answer: B. HDFS, YARN and MapReduce have distinct roles.
+
+Explanation: HDFS provides distributed storage, YARN manages computing resources, and MapReduce performs distributed batch computation.
+
+# Q4. A research organization wants datasets to remain discoverable and reusable years after collection. Which practice is most appropriate?
+
+A. Delete dataset descriptions after ingestion. B. Retain only the newest copy of every dataset. C. Store files without documenting their source. D. Maintain metadata, provenance, ownership, access policies and data quality information.
+
+Correct answer: D. Maintain metadata and data curation.
+
+Explanation: Data curation preserves a dataset's origin, meaning, quality and usability throughout its lifecycle.
+
+ Section 2: Hadoop, HDFS and architecture
+
+# Q5. What is the primary responsibility of the HDFS NameNode?
+
+A. Execute every Spark task B. Maintain filesystem namespace and metadata, including file-to-block mappings C. Store every file's complete contents on its local disk D. Consume Kafka messages
+
+Correct answer: B. Maintain filesystem metadata.
+
+Explanation: DataNodes store the actual HDFS blocks. The NameNode manages namespace information, permissions and block-location metadata.
+
+# Q6. An HDFS file is 256 MB, and the block size is 128 MB. Ignoring special file-layout considerations, how many logical HDFS blocks are required?
+
+A. 1 B. 3 C. 2 D. 128
+
+Correct answer: C. 2
+
+Explanation: Two blocks of 128 MB each are required. Replication creates additional physical copies but does not change the number of logical blocks.
+
+# Q7. An HDFS cluster has a replication factor of 3. One DataNode storing a block replica fails. What should happen?
+
+A. All copies of the file are immediately deleted. B. HDFS uses surviving replicas and can schedule re-replication to restore the configured factor. C. The file is automatically converted into a Hive table. D. The file must always be permanently lost.
+
+Correct answer: B. Use surviving replicas and restore replication.
+
+Explanation: If sufficient healthy replicas remain, HDFS can continue serving reads and schedule new replicas to restore the desired replication factor.
+
+# Q8. What is the primary purpose of YARN?
+
+A. Manage cluster resources and coordinate application execution B. Replace HDFS file permissions C. Store Hive table rows D. Maintain Kafka consumer offsets
+
+Correct answer: A. Manage cluster resources and coordinate application execution.
+
+Explanation: The ResourceManager manages cluster resources, NodeManagers manage resources on individual nodes, and an ApplicationMaster coordinates an application.
+
+# Q9. A local file named `events.csv` must be uploaded to the HDFS directory `/data/raw`. Which command is correct?
+
+A. `hdfs dfs -cat events.csv /data/raw` B. `hdfs dfs -rm events.csv /data/raw` C. `hdfs dfs -put events.csv /data/raw/` D. `hdfs namenode -format events.csv`
+
+Correct answer: C. `hdfs dfs -put events.csv /data/raw/`
+
+Explanation: The `-put` command copies a local file into HDFS. Other useful commands include `-ls`, `-mkdir -p`, `-cat` and `-get`.
+
+# Q10. After a NameNode restart, HDFS reports that safe mode is ON, and writes are rejected. What should the administrator do first?
+
+A. Format the NameNode immediately. B. Delete all DataNode directories. C. Investigate safe-mode status, DataNode health and block-report conditions. D. Restart every application without checking logs.
+
+Correct answer: C. Investigate safe mode and cluster health.
+
+Explanation: HDFS safe mode is a protective state, often entered during startup while block reports arrive. Diagnose why it remains active before attempting corrective action. Formatting the NameNode can destroy filesystem metadata.
+
+ Section 3: MapReduce
+
+# Q11. In a Word Count MapReduce program, what does the Mapper typically emit for the word `data`?
+
+A. `data → 1` B. `1 → data` C. `data → data` D. `data → 0`
+
+Correct answer: A. `data → 1`
+
+Explanation: The Mapper emits a key-value pair for each word. The framework groups values for the same key, and the Reducer calculates the total.
+
+# Q12. What happens during the Shuffle and Sort stage of MapReduce?
+
+A. All source files are deleted. B. Intermediate Mapper output is transferred and grouped by key for the appropriate Reducers. C. The entire dataset is loaded into one machine's memory. D. HDFS replication is permanently disabled.
+
+Correct answer: B. Intermediate output is grouped and transferred by key.
+
+Explanation: Shuffle and Sort organize intermediate key-value pairs so each Reducer receives the values associated with its keys. This network transfer can be expensive.
+
+# Q13. A MapReduce job processes 1 TB of input, but one Reducer takes much longer than the others. What is a likely cause?
+
+A. HDFS replication is always too high. B. The NameNode converts the input to JSON. C. Data skew sends disproportionately more data or work to one Reducer. D. Every Mapper is always executed twice.
+
+Correct answer: C. Data skew.
+
+Explanation: A dominant key can overload a Reducer. Investigate key distribution and partitioning; simply increasing the number of Reducers may not resolve a single hot key.
+
+ Section 4: HBase
+
+# Q14. A logistics company needs quick lookups and frequent updates to shipment records by unique shipment ID. Which technology is most suitable?
+
+A. HBase B. Static HTML C. MapReduce alone D. A CSV file that must be scanned from beginning to end for every lookup
+
+Correct answer: A. HBase
+
+Explanation: HBase is a distributed, column-family-oriented NoSQL database built on HDFS. It supports row-key-based random reads and writes and is suitable for large, sparse datasets.
+
+# Q15. Which HBase shell command retrieves a specific row using its row key?
+
+A. `scan 'shipments'` B. `put 'shipments', 'S101', 'info:status', 'DELIVERED'` C. `get 'shipments', 'S101'` D. `create 'S101', 'shipments'`
+
+Correct answer: C. `get 'shipments', 'S101'`
+
+Explanation: `get` retrieves a specific row, `scan` reads multiple rows, `put` inserts or updates a cell, and `create` creates a table.
+
+ Section 5: Hive and HiveQL
+
+# Q16. Why do data engineers use Apache Hive?
+
+A. To replace the Linux operating system B. To query and analyze large datasets using SQL-like HiveQL C. To configure network routers D. To replace every streaming system
+
+Correct answer: B. Query and analyze large datasets using HiveQL.
+
+Explanation: Hive provides a data warehouse layer over distributed storage and can execute queries using supported engines such as Tez or MapReduce, depending on configuration.
+
+# Q17. Under typical Hive managed-table behavior, what happens when a managed table is dropped?
+
+A. Metadata is removed, but the data must always remain. B. The table metadata and its managed data are normally removed. C. The HDFS NameNode is deleted. D. The Hive service is permanently shut down.
+
+Correct answer: B. The metadata and managed data are normally removed.
+
+Explanation: Hive controls the data lifecycle of managed tables. Dropping an external table normally removes its metadata but retains the underlying data. Exact behavior can depend on configuration and table properties.
+
+# Q18. Application logs are stored in HDFS, and the team wants Hive to query them without taking ownership of the underlying files. Which table type is generally appropriate?
+
+A. External table B. Managed table only C. Temporary table only D. HBase namespace
+
+Correct answer: A. External table
+
+Explanation: External tables are useful when files are managed independently of Hive or must remain available after the table definition is dropped.
+
+# Q19. A Hive table contains 100 million records. Queries frequently filter by `event_date`. Which design can help reduce the data scanned?
+
+A. Partition the table by `event_date`. B. Rename every column to the same name. C. Store the entire table in one local file. D. Remove the date values.
+
+Correct answer: A. Partition by `event_date`.
+
+Explanation: When partition pruning applies, Hive can skip partitions outside the requested date range. Excessive tiny partitions can hurt performance, so partition design must match query patterns.
+
+# Q20. A Hive table is partitioned by date, but queries frequently filter by customer ID within each date. Which technique may help organize data within partitions?
+
+A. Bucketing by customer ID B. Deleting the partition column C. Disabling all query optimizations D. Replacing every value with a constant
+
+Correct answer: A. Bucketing by customer ID.
+
+Explanation: Bucketing distributes records into a specified number of files based on a hash of selected columns. It can help certain joins and sampling operations, depending on the execution engine and table layout. Partitioning and bucketing solve different problems.
+
+# Q21. A Hive query needs to convert customer names to uppercase using custom Java logic unavailable as a suitable built-in function. Which feature is appropriate?
+
+A. HDFS replication B. YARN ResourceManager C. User-Defined Function (UDF) D. Kafka consumer offset
+
+Correct answer: C. User-Defined Function (UDF)
+
+Explanation: A UDF typically processes one input row and returns a value. A UDAF aggregates multiple rows, while a UDTF can produce multiple output rows from an input.
+
+ Section 6: Data warehousing, ETL and Airflow
+
+# Q22. A pipeline extracts records from a source, cleans invalid values, converts data types, and loads the results into a warehouse. What is this process called?
+
+A. ETL B. DNS C. RAID D. CRUD only
+
+Correct answer: A. ETL
+
+Explanation: ETL means Extract, Transform, Load. In ELT, data is loaded first and transformed within the destination platform. Both approaches are used in modern data engineering.
+
+# Q23. A retail analytics team needs to organize sales transactions for reporting. Which design most closely matches a typical star schema?
+
+A. Store all data in one unstructured text file. B. Use a central fact table linked to dimension tables such as product, date and store. C. Store every transaction only in a Kafka topic. D. Use one dimension table without transaction measures or relationships.
+
+Correct answer: B. A fact table linked to dimension tables.
+
+Explanation: A fact table stores measurable events, such as sales quantity and revenue. Dimension tables describe the context, such as product, date, customer and store.
+
+# Q24. In Apache Airflow, what is a DAG?
+
+A. A distributed database table B. A Directed Acyclic Graph defining workflow tasks and dependencies C. A Kafka partition D. A Java compiler
+
+Correct answer: B. A Directed Acyclic Graph.
+
+Explanation: An Airflow DAG defines workflow structure and dependencies. Tasks can be implemented using operators, while the scheduler determines when eligible tasks should run.
+
+# Q25. A daily Airflow pipeline must wait until `events.csv` appears before uploading it to HDFS. Which feature is designed for this requirement?
+
+A. Sensor B. Reducer C. HDFS replication factor D. Spark broadcast variable
+
+Correct answer: A. Sensor
+
+Explanation: A sensor waits for a condition, such as file arrival. A robust workflow should also check timeouts, retries and whether the file is complete before processing it.
+
+# Q26. An Airflow task loads transformed records into a database, fails after partially writing data, and is retried. Which design best reduces duplicate records?
+
+A. Append every record again without checking. B. Disable task logs. C. Use stable keys and idempotent load logic, such as deduplication or merge/upsert operations. D. Delete the entire HDFS cluster before every retry.
+
+Correct answer: C. Use idempotent load logic.
+
+Explanation: Idempotency means repeated execution produces the same intended result instead of duplicate side effects. Airflow retries alone do not guarantee exactly-once writes to external systems.
+
+ Section 7: Apache Spark, RDDs and optimization
+
+# Q27. What is an RDD in Apache Spark?
+
+A. A relational database server B. A Resilient Distributed Dataset that supports distributed parallel processing and fault recovery C. A Kafka topic configuration D. A Hive partition directory only
+
+Correct answer: B. A Resilient Distributed Dataset.
+
+Explanation: RDDs distribute data across partitions and support parallel transformations and actions. Lineage allows Spark to recompute lost partitions in many failure scenarios.
+
+# Q28. Which statement correctly distinguishes a Spark transformation from an action?
+
+A. `map()` is an action, and `count()` is a transformation. B. Both always write data to HDFS immediately. C. `filter()` is a transformation, and `count()` is an action. D. Transformations can only be applied to DataFrames.
+
+Correct answer: C. `filter()` is a transformation, and `count()` is an action.
+
+Explanation: Transformations define new datasets. Actions such as `count()`, `collect()` and `saveAsTextFile()` trigger execution. Spark commonly evaluates transformations lazily.
+
+# Q29. Consider this PySpark code:
+
+```
+rdd = sc.parallelize([10, 20, 30, 40])result = rdd.filter(lambda x: x > 20).count()print(result)
+```
+
+What is the output?
+
+A. 4 B. 3 C. 2 D. 1
+
+Correct answer: C. 2
+
+Explanation: The filter retains `30` and `40`. The `count()` action returns the number of retained elements, which is two.
+
+# Q30. A Spark program reuses the same expensive intermediate DataFrame in five separate actions. Which approach may reduce repeated computation?
+
+A. Cache or persist the DataFrame and reuse it when beneficial. B. Convert every DataFrame to a string. C. Restart the cluster before each action. D. Increase the number of output columns.
+
+Correct answer: A. Cache or persist the DataFrame.
+
+Explanation: Caching can reuse computed partitions instead of recomputing them for every action. It consumes storage resources, so cache data when the expected reuse justifies the cost.
+
+# Q31. A Spark join combines a very large DataFrame with a small lookup DataFrame that fits in worker memory. Which technique may avoid shuffling the large DataFrame?
+
+A. Broadcast join B. Collect the entire large DataFrame to the driver C. Convert all records into strings D. Disable the query optimizer
+
+Correct answer: A. Broadcast join.
+
+Explanation: Spark can distribute the small table to workers and join it locally with partitions of the large table. This is appropriate when the small side fits within available memory and the execution plan supports it.
+
+# Q32. A Spark job spends most of its time transferring data between executors during a large join. Which operation is most directly associated with this cost?
+
+A. A shuffle B. A Python variable assignment C. A local print statement D. A column alias change alone
+
+Correct answer: A. A shuffle.
+
+Explanation: A shuffle redistributes data between partitions. Large joins, aggregations and sorting operations can trigger shuffles. Examine the query plan, partitioning, skew and possible broadcast strategies to reduce unnecessary data movement.
+
+# Q33. Which statement about RDDs, DataFrames and Datasets is correct?
+
+A. RDDs always outperform DataFrames for every workload. B. DataFrames provide a schema-aware API that supports Spark SQL optimizations; typed Datasets are available in Scala and Java APIs. C. DataFrames cannot represent tabular data. D. PySpark provides the same strongly typed Dataset API as Scala.
+
+Correct answer: B. DataFrames support structured query optimizations.
+
+Explanation: RDDs offer lower-level flexibility. DataFrames enable query planning and optimization through Spark SQL. Typed Datasets are supported in Scala and Java, while PySpark primarily uses DataFrames rather than a typed Dataset API.
+
+# Q34. A Spark job produces 10,000 tiny output files, making downstream processing inefficient. What is the best response?
+
+A. Increase the number of partitions without measuring the effect. B. Remove the schema from every dataset. C. Review the partition count and use appropriate `repartition()` or `coalesce()` before writing. D. Convert all data into one record.
+
+Correct answer: C. Review partitions and adjust before writing.
+
+Explanation: Too many small files increase metadata overhead and downstream task costs. `coalesce()` can reduce partitions with limited redistribution, while `repartition()` redistributes data. The appropriate choice depends on data volume, skew and output requirements.
+
+ Section 8: PySpark EDA and Spark SQL
+
+# Q35. A dataset contains null values in `customer_age`. What should a data engineer do before calculating average age?
+
+A. Convert every null to zero without checking its meaning. B. Examine the missing-data pattern and choose a suitable treatment, such as filtering, imputation or retaining nulls. C. Delete every record in the dataset. D. Rename the column and ignore data quality.
+
+Correct answer: B. Investigate missing values and choose an appropriate treatment.
+
+Explanation: Nulls may mean unknown, unavailable or inapplicable. Replacing them with zero can distort statistics. The strategy should match the business meaning and analytical objective.
+
+# Q36. A column contains numeric values stored as strings, such as `"120"`, `"250"` and `"90"`. Why should it usually be converted to a numeric type before calculating an average?
+
+A. Strings cannot be stored in Spark. B. Spark automatically interprets every string as a date. C. Numeric conversion enables valid arithmetic and aggregation, while invalid strings can be handled explicitly. D. Type conversion automatically removes duplicates.
+
+Correct answer: C. Numeric conversion enables valid arithmetic.
+
+Explanation: Correct data types are essential for meaningful calculations. A robust pipeline detects malformed values and checks for unexpected nulls after conversion.
+
+# Q37. A Spark SQL query must assign a unique sequential number to employees within each department, with the highest salary first. Which approach is appropriate?
+
+A. `ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC)` B. `COUNT(*) GROUP BY salary DESC` C. `DROP TABLE employees` D. `SELECT DISTINCT salary` only
+
+Correct answer: A. Use `ROW_NUMBER()` with a window function.
+
+Explanation: Window functions calculate results across related rows without collapsing each group into one row. `ROW_NUMBER()` assigns unique sequential numbers. For deterministic results when salaries tie, add a secondary ordering column, such as employee ID.
+
+# Q38. A PySpark EDA report needs to identify the most frequent event type in a large dataset. Which approach is most appropriate?
+
+A. Collect the entire raw dataset and process it on the driver. B. Group by event type, count occurrences, sort by count descending and retrieve a small result. C. Convert the dataset into an image. D. Delete duplicate event types before counting them.
+
+Correct answer: B. Aggregate and sort in Spark.
+
+Explanation: Distributed aggregation reduces the data before results are returned to the driver. Collecting a large raw dataset can exhaust driver memory. Retrieve only the top results when a full listing is unnecessary.
+
+ Section 9: Kafka and streaming
+
+# Q39. In a Kafka-based pipeline, what is the responsibility of a producer?
+
+A. Publish records to Kafka topics B. Execute Hive queries only C. Manage the HDFS NameNode namespace D. Train every Spark MLlib model
+
+Correct answer: A. Publish records to Kafka topics.
+
+Explanation: Producers send records to topics. Brokers store topic partitions, and consumers read records. Kafka is commonly used for event ingestion and streaming data integration.
+
+# Q40. A Kafka topic has six partitions, and a consumer group has three active consumers. Assuming balanced assignment and that all consumers can read all partitions, how many partitions can each consumer receive?
+
+A. Six B. Three C. Two D. Zero
+
+Correct answer: C. Two
+
+Explanation: Within one consumer group, a partition is assigned to at most one consumer at a time. Six partitions can be balanced across three consumers, with two partitions per consumer.
+
+# Q41. A Kafka consumer is processing events more slowly than producers are publishing them. The number of unprocessed records keeps increasing. What should the engineer investigate first?
+
+A. Whether HDFS is automatically deleting Kafka topics B. Consumer lag, processing throughput, partition distribution and downstream bottlenecks C. Whether the NameNode has converted records into Hive tables D. Whether every message should be manually deleted
+
+Correct answer: B. Investigate consumer lag and throughput.
+
+Explanation: Consumer lag indicates how far behind a consumer is relative to the available topic data. Check processing time, consumer health, partition assignment, resource utilization and sink performance before deciding whether to scale consumers or optimize processing.
+
+# Q42. A streaming application receives events late because devices have unreliable network connections. Which Spark Structured Streaming feature can help manage late-arriving events in event-time window aggregations?
+
+A. Watermarks B. HDFS replication factor C. Hive table ownership D. Python list indexing
+
+Correct answer: A. Watermarks
+
+Explanation: A watermark defines how long a streaming query is prepared to wait for late event-time data while managing aggregation state. Its behavior depends on the query, output mode and stateful operation; it does not guarantee that every arbitrarily late event will be included.
+
+# Q43. What is Apache Kafka Connect primarily used for?
+
+A. Connecting data sources and sinks to Kafka through reusable connectors B. Replacing the JVM C. Executing every Spark SQL query D. Formatting HDFS block metadata
+
+Correct answer: A. Connecting data sources and sinks to Kafka.
+
+Explanation: Source connectors bring external data into Kafka; sink connectors export Kafka data to external systems. Kafka Connect can run in standalone or distributed mode.
+
+ Section 10: Spark MLlib, cloud and end-to-end scenarios
+
+# Q44. A data science team wants to predict whether a railway trip will be delayed by more than 15 minutes. The target contains `YES` or `NO`. Which type of machine learning problem is this?
+
+A. Clustering B. Classification C. Association rule mining only D. Dimensionality reduction only
+
+Correct answer: B. Classification
+
+Explanation: Classification predicts a discrete category. If the target were the actual delay duration in minutes, the task would instead be a regression problem.
+
+# Q45. A Spark MLlib model achieves 99% accuracy on training data but only 65% accuracy on unseen test data. What is the most likely concern?
+
+A. The model may be overfitting the training data. B. HDFS replication is automatically disabled. C. Kafka has no partitions. D. The Spark DataFrame must contain no columns.
+
+Correct answer: A. Overfitting.
+
+Explanation: Overfitting occurs when a model learns patterns specific to training data that do not generalize. Investigate data leakage, model complexity, train/test splitting and regularization. For imbalanced classes, also examine precision, recall, F1-score and the confusion matrix.
+
+# Q46. A Spark workload runs on a cloud cluster, and data volume increases substantially during business hours. Which approach can help manage changing demand?
+
+A. Allocate the maximum number of machines permanently without measuring usage. B. Disable monitoring and logging. C. Use cluster autoscaling where supported and monitor workload performance and cost. D. Move all processing into the Airflow scheduler process.
+
+Correct answer: C. Use autoscaling and monitor cost.
+
+Explanation: Autoscaling can add or remove compute resources as workload demand changes. Engineers must also consider startup delays, shuffle-heavy stages, minimum and maximum cluster sizes, and storage costs.
+
+# Q47. A Spark job reads data from a relational database using JDBC. The source database slows down because the job opens too many simultaneous connections. What is the best response?
+
+A. Increase JDBC parallelism without checking the database. B. Tune partitioned reads and connection counts to balance throughput with database capacity. C. Read the entire database into one Python list on the driver. D. Disable database monitoring.
+
+Correct answer: B. Tune parallelism and connection counts.
+
+Explanation: Spark can read and write relational databases through JDBC. Excessive parallelism can overload the source. Select suitable partition bounds, connection counts and batch sizes while monitoring database capacity.
+
+# Q48. A sales analytics team wants to compare monthly revenue across stores and product categories. Which SQL operation is most appropriate for calculating the grouped revenue?
+
+A. `GROUP BY` with `SUM(revenue)` B. `DROP TABLE` C. `DELETE FROM sales` D. `ORDER BY` without an aggregation
+
+Correct answer: A. `GROUP BY` with `SUM(revenue)`.
+
+Explanation: `GROUP BY` groups records by selected dimensions, while `SUM()` aggregates revenue within each group. `ORDER BY` can then sort the resulting totals.
+
+# Q49. An Airflow pipeline works on a developer's laptop but fails in a managed cloud Airflow environment. What is the best first troubleshooting approach?
+
+A. Assume the cloud environment has the same packages, paths and credentials as the laptop. B. Check dependency installation, connection configuration, permissions, environment variables, network access and storage paths. C. Delete the DAG and recreate the entire cluster immediately. D. Disable all task logs and retries.
+
+Correct answer: B. Verify environment and connectivity differences.
+
+Explanation: Managed Airflow environments may have different installed libraries, execution identities, secrets, network rules and filesystem layouts. Inspect task logs and environment configuration before changing infrastructure.
+
+# Q50. A company receives daily JSON files and continuous order events. It needs historical reports and near-real-time analytics. Which architecture best integrates the syllabus technologies?
+
+A. Use Hive alone for every ingestion, orchestration, streaming and machine learning requirement. B. Use Kafka alone for orchestration, batch transformations and every historical query. C. Use Airflow to orchestrate batch workflows, HDFS or cloud storage for data, Spark for transformations and analytics, Hive or Spark SQL for queries, and Kafka with Structured Streaming for real-time events. D. Use a local text editor and manually combine all files every day.
+
+Correct answer: C. Integrate the technologies according to their responsibilities.
+
+Explanation: This architecture separates orchestration, storage, processing, querying and streaming.
+
+- Airflow: schedules and coordinates tasks.
+- HDFS or cloud storage: stores raw and processed datasets.
+- Spark: performs scalable transformations, analytics and machine learning.
+- Hive / Spark SQL: supports SQL-based analytical queries.
+- Kafka: ingests and transports continuous events.
+- Spark Structured Streaming: processes event streams.
+- Monitoring and validation: detect failures, bad records, duplicates and data quality problems.
+
+Production systems also need access control, schema evolution, checkpointing, idempotent writes, recovery procedures, observability and cost management.
+
+ Answer key: Quick revision
+
+Use this table to check answers after attempting all 50 questions without looking at the explanations.
+
+| Q  | Ans. | Q  | Ans. | Q  | Ans. | Q  | Ans. | Q  | Ans. |
+
+| 1  | C    | 11 | A    | 21 | C    | 31 | A    | 41 | B    |
+| 2  | A    | 12 | B    | 22 | A    | 32 | A    | 42 | A    |
+| 3  | B    | 13 | C    | 23 | B    | 33 | B    | 43 | A    |
+| 4  | D    | 14 | A    | 24 | B    | 34 | C    | 44 | B    |
+| 5  | B    | 15 | C    | 25 | A    | 35 | B    | 45 | A    |
+| 6  | C    | 16 | B    | 26 | C    | 36 | C    | 46 | C    |
+| 7  | B    | 17 | B    | 27 | B    | 37 | A    | 47 | B    |
+| 8  | A    | 18 | A    | 28 | C    | 38 | B    | 48 | A    |
+| 9  | C    | 19 | A    | 29 | C    | 39 | A    | 49 | B    |
+| 10 | C    | 20 | A    | 30 | A    | 40 | C    | 50 | C    |
+
+
+
+
+ Section 1: Hadoop, HDFS and MapReduce
+
+1. What is the primary purpose of HDFS Federation?
+
+(A) To increase the replication factor of every data block  
+(B) To provide multiple independent namespaces and scale NameNode namespace management  
+(C) To replace the Secondary NameNode with a standby NameNode  
+(D) To eliminate DataNodes  
+
+Answer: (B)
+
+2. In MapReduce, what happens during the Shuffle and Sort phase?
+
+(A) The final output is written to HDFS  
+(B) Intermediate key-value pairs are transferred to reducers and grouped by key  
+(C) Input data is converted into SQL tables  
+(D) The NameNode replicates data blocks  
+
+Answer: (B)
+
+3. A Kafka topic has six partitions. What is a key benefit of partitioning the topic across consumers?
+
+(A) Every consumer automatically receives every message  
+(B) Data is processed in parallel, subject to partition assignment and consumer-group limits  
+(C) Message ordering is guaranteed across all partitions  
+(D) Kafka no longer needs brokers  
+
+Answer: (B)
+
+4. Which HDFS command copies a local file into HDFS?
+
+(A) `hdfs dfs -get file.txt /input`  
+(B) `hdfs dfs -copyToLocal file.txt /input`  
+(C) `hdfs dfs -put file.txt /input`  
+(D) `hdfs dfs -cat file.txt /input`  
+
+Answer: (C)
+
+5. What is the main responsibility of the Secondary NameNode in traditional Hadoop architecture?
+
+(A) Act as an automatically available hot standby  
+(B) Periodically create checkpoints by merging the fsimage and edit logs  
+(C) Store actual HDFS file contents  
+(D) Schedule Spark applications  
+
+Answer: (B)
+
+6. Which Hive table type allows Hive to manage the metadata while leaving the underlying data files outside Hive's normal ownership and deletion lifecycle?
+
+(A) Managed table  
+(B) Temporary table  
+(C) External table  
+(D) Materialized view  
+
+Answer: (C)
+
+7. A data engineer needs to perform exploratory data analysis using Python syntax on structured big data. Which Spark API is generally the best starting point?
+
+(A) GraphX  
+(B) PySpark DataFrame API  
+(C) Spark's low-level RDD API only  
+(D) Hadoop Streaming  
+
+Answer: (B)
+
+8. Which is a major advantage of a data lake compared with a traditional, schema-on-write data warehouse?
+
+(A) It guarantees that every query is faster  
+(B) It eliminates the need for data governance  
+(C) It can retain raw structured, semi-structured, and unstructured data before defining its analytical structure  
+(D) It automatically guarantees ACID transactions for every file format  
+
+Answer: (C)
+
+9. Which statement correctly describes an RDD in Apache Spark?
+
+(A) It is immutable, distributed across partitions, and fault-tolerant through lineage  
+(B) It must always be stored in memory  
+(C) It requires a predefined relational schema  
+(D) It cannot be recomputed after partition loss  
+
+Answer: (A)
+
+10. In Apache Airflow, which component is designed to wait for a condition, such as the arrival of an input file?
+
+(A) Hook  
+(B) Sensor  
+(C) DAG  
+(D) Executor  
+
+Answer: (B)
+
+11. A data pipeline must reject records with missing customer IDs and invalid dates before loading them into the target table. Which practice addresses this requirement most directly?
+
+(A) Data quality validation  
+(B) Increasing the HDFS replication factor  
+(C) Increasing the Kafka retention period  
+(D) Enabling Spark broadcast variables  
+
+Answer: (A)
+
+12. What is the primary role of the HBase Master?
+
+(A) Execute every client read and write directly  
+(B) Store all table data in its local memory  
+(C) Coordinate cluster administration, region assignment, and region-server management  
+(D) Replace HDFS DataNodes  
+
+Answer: (C)
+
+13. Which AWS service provides managed clusters for running Hadoop and Spark workloads?
+
+(A) Amazon RDS  
+(B) AWS Lambda  
+(C) Amazon EMR  
+(D) Amazon DynamoDB  
+
+Answer: (C)
+
+14. Why can traditional MapReduce be slower than Spark for iterative machine-learning algorithms?
+
+(A) MapReduce cannot execute Java programs  
+(B) MapReduce jobs commonly materialize intermediate results to disk between stages or iterations  
+(C) Spark cannot distribute computations  
+(D) MapReduce has no fault-tolerance mechanism  
+
+Answer: (B)
+
+15. What is the default HDFS replication factor in a typical Hadoop configuration when it has not been overridden?
+
+(A) 1  
+(B) 3  
+(C) 5  
+(D) 10  
+
+Answer: (B)
+
+ Section 2: Hive and Data Warehousing
+
+16. What does the `PARTITIONED BY` clause do when defining a Hive table?
+
+(A) Creates a fixed number of hash buckets  
+(B) Organizes data into partitions based on partition-column values, commonly represented by separate directory paths  
+(C) Sorts every record globally  
+(D) Replicates the table to three NameNodes  
+
+Answer: (B)
+
+17. Which Kafka API is designed for building stream-processing applications that consume records, transform them, and produce results to Kafka topics?
+
+(A) Kafka Connect API  
+(B) Producer API only  
+(C) Consumer API only  
+(D) Kafka Streams API  
+
+Answer: (D)
+
+18. A DataNode fails, but other replicas of its blocks remain available. What can HDFS do to restore the configured replication level?
+
+(A) Immediately delete all files on the cluster  
+(B) Replicate under-replicated blocks from surviving replicas  
+(C) Convert the blocks into Hive partitions  
+(D) Restart every client application  
+
+Answer: (B)
+
+19. Which statement is NOT a characteristic of Spark DataFrames?
+
+(A) They have a schema  
+(B) They support SQL-style operations  
+(C) Their transformations are generally evaluated lazily  
+(D) They are inherently schema-less and unstructured  
+
+Answer: (D)
+
+20. In Spark, which deployment mode places the driver inside the cluster rather than running it on the submitting client machine?
+
+(A) Local mode  
+(B) Client mode  
+(C) Cluster mode  
+(D) Interactive shell mode  
+
+Answer: (C)
+
+21. An Airflow workflow must run Task B only after Task A succeeds. How should this dependency be represented?
+
+(A) By increasing the scheduler's polling frequency  
+(B) By defining a task dependency in the DAG  
+(C) By converting Task A into a Hive partition  
+(D) By using a Kafka consumer group  
+
+Answer: (B)
+
+22. What does the `kafka-console-consumer` command do?
+
+(A) Publishes messages to a Kafka topic  
+(B) Reads messages from a Kafka topic  
+(C) Creates an HDFS directory  
+(D) Registers an Airflow DAG  
+
+Answer: (B)
+
+23. A Spark job repeatedly joins a very large DataFrame with a small reference dataset. Which feature can reduce repeated distribution of the small dataset when a broadcast join is appropriate?
+
+(A) Broadcast variables or a broadcast join  
+(B) HDFS replication factor  
+(C) Airflow sensors  
+(D) Kafka retention settings  
+
+Answer: (A)
+
+24. Which file format is columnar and commonly used for efficient analytical queries in Hive and Spark?
+
+(A) Plain text  
+(B) CSV  
+(C) Parquet  
+(D) Uncompressed log text  
+
+Answer: (C)
+
+25. A Spark job processes most partitions quickly, but one task takes much longer because a few keys contain disproportionately large amounts of data. What is this problem called, and what is one possible remedy?
+
+(A) Schema evolution; rename the columns  
+(B) Data skew; use techniques such as key salting or skew-aware joins  
+(C) Replication failure; reduce the number of DataNodes  
+(D) Checkpoint failure; disable all transformations  
+
+Answer: (B)
+
+26. Which command lists files and directories in an HDFS directory?
+
+(A) `hdfs dfs -cat /data`  
+(B) `hdfs dfs -ls /data`  
+(C) `hdfs dfs -mkdir /data`  
+(D) `hdfs dfs -rm /data`  
+
+Answer: (B)
+
+27. In Hive, what is the purpose of `CLUSTERED BY` when used to define bucketing?
+
+(A) To divide the table into directories for every partition-column value  
+(B) To distribute rows into a configured number of buckets based on a bucketing expression  
+(C) To create a relational database index automatically  
+(D) To sort all rows globally across the cluster  
+
+Answer: (B)
+
+28. A Spark DataFrame requires a custom business calculation that is not available as a built-in function. Which feature can implement this logic for use in DataFrame expressions?
+
+(A) User-defined function (UDF)  
+(B) NameNode checkpoint  
+(C) Kafka partition reassignment  
+(D) HDFS block replication  
+
+Answer: (A)
+
+29. What is the main purpose of the Write-Ahead Log (WAL) in HBase?
+
+(A) Store the entire Hive metastore  
+(B) Record edits durably so writes can be recovered if needed before they are safely persisted in store files  
+(C) Replace HDFS replication  
+(D) Sort all HBase tables alphabetically  
+
+Answer: (B)
+
+30. Which Hadoop component manages cluster resources and schedules applications through resource allocation?
+
+(A) HDFS  
+(B) Hive  
+(C) YARN  
+(D) HBase  
+
+Answer: (C)
+
+ Section 3: Spark, Streaming and Machine Learning
+
+31. A Spark Structured Streaming application receives events that arrive several minutes after their event timestamps. Which feature helps define how long the application should wait for late events when maintaining event-time aggregations?
+
+(A) `repartition(1)`  
+(B) Watermarking  
+(C) `coalesce(1)`  
+(D) Broadcast variables  
+
+Answer: (B)
+
+32. A data engineering team first loads raw data into a target analytical platform and then transforms it using that platform's processing engine. What is this approach called?
+
+(A) ETL  
+(B) ELT  
+(C) OLTP  
+(D) CDC only  
+
+Answer: (B)
+
+33. In Spark MLlib, what is the purpose of a `Pipeline`?
+
+(A) To chain multiple transformers and estimators into a single machine-learning workflow  
+(B) To replace the Spark cluster manager  
+(C) To create Kafka topics automatically  
+(D) To configure HDFS replication  
+
+Answer: (A)
+
+34. Which Spark SQL window function assigns ranks with gaps after tied values?
+
+(A) `row_number()`  
+(B) `rank()`  
+(C) `dense_rank()`  
+(D) `lag()`  
+
+Answer: (B)
+
+35. A company wants to recommend products based on user-item interaction data using collaborative filtering. Which Spark MLlib algorithm is most appropriate?
+
+(A) K-Means  
+(B) ALS (Alternating Least Squares)  
+(C) Logistic Regression  
+(D) Decision Tree Classifier  
+
+Answer: (B)
+
+36. When using Amazon EMR, what is a key consideration when choosing Spot Instances for worker nodes?
+
+(A) They guarantee uninterrupted execution  
+(B) They can reduce cost, but AWS may reclaim them  
+(C) They always provide better performance than On-Demand Instances  
+(D) They eliminate the need for checkpointing  
+
+Answer: (B)
+
+37. What does a Kafka Connect Sink Connector do?
+
+(A) Imports records from an external system into Kafka  
+(B) Exports records from Kafka to an external destination  
+(C) Replaces all Kafka brokers  
+(D) Schedules Spark MLlib training jobs  
+
+Answer: (B)
+
+38. A Spark Structured Streaming job must recover after failure without losing track of processed data. Which design best supports fault tolerance and exactly-once processing where the source and sink support the required guarantees?
+
+(A) Use checkpointing with a compatible source and transactional or otherwise correctly coordinated sink  
+(B) Increase the trigger interval and ignore failures  
+(C) Force all records into one partition  
+(D) Delete checkpoint data after every batch  
+
+Answer: (A)
+
+39. Which of the following is a valid way to read a CSV file with a header into a Spark DataFrame?
+
+(A) `spark.read.option("header", "true").csv("path")`  
+(B) `spark.read.format("csv").option("header", "true").load("path")`  
+(C) `spark.read.csv("path", header=True)` in PySpark  
+(D) All of the above  
+
+Answer: (D)
+
+40. What is the role of an HBase RegionServer?
+
+(A) Maintain the complete HDFS namespace  
+(B) Serve read/write requests for the regions it hosts  
+(C) Act as the Hive query optimizer  
+(D) Schedule YARN containers for every Hadoop application  
+
+Answer: (B)
+
+ Section 4: Airflow, Reliability and Data Engineering
+
+41. An Airflow DAG must submit a Spark application using `spark-submit`. Which operator is specifically designed for this integration when the relevant Airflow provider is installed and configured?
+
+(A) `BashOperator`  
+(B) `PythonOperator`  
+(C) `SparkSubmitOperator`  
+(D) `EmailOperator`  
+
+Answer: (C)
+
+42. A daily ETL pipeline may be retried after a network failure. How should the data engineer design the load to avoid duplicate records when the same batch is processed again?
+
+(A) Append all records on every retry without checking existing data  
+(B) Make the operation idempotent using suitable keys, deduplication, or transactional merge/upsert logic  
+(C) Disable task retries permanently  
+(D) Increase the number of Spark executors only  
+
+Answer: (B)
+
+43. Which Spark operation allows an RDD to be persisted using a storage level that uses memory and disk?
+
+(A) `rdd.collect()`  
+(B) `rdd.persist(StorageLevel.MEMORY_AND_DISK)`  
+(C) `rdd.countByValue()`  
+(D) `rdd.take(1)`  
+
+Answer: (B)
+
+44. In Hive, what is the primary role of a SerDe?
+
+(A) To allocate YARN containers  
+(B) To serialize and deserialize data between stored representations and Hive's processing representation  
+(C) To replicate HDFS blocks  
+(D) To schedule Airflow tasks  
+
+Answer: (B)
+
+45. In YARN, which component runs on each worker node and manages containers and node-level resource reporting?
+
+(A) ResourceManager  
+(B) NodeManager  
+(C) NameNode  
+(D) Secondary NameNode  
+
+Answer: (B)
+
+46. Which setup supports HDFS NameNode High Availability?
+
+(A) A Secondary NameNode alone  
+(B) An active NameNode, a standby NameNode, and a supported shared edits mechanism such as a JournalNode quorum  
+(C) A single NameNode with a replication factor of three  
+(D) Three Hive metastore servers without a standby NameNode  
+
+Answer: (B)
+
+47. Which SQL expression calculates a running total of `amount` for each customer ordered by transaction time?
+
+(A) `SUM(amount) OVER (PARTITION BY customer_id ORDER BY transaction_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)`  
+(B) `ROW_NUMBER() OVER (PARTITION BY customer_id)`  
+(C) `LAG(amount, 1) OVER (PARTITION BY customer_id)`  
+(D) `COUNT(*) GROUP BY transaction_time`  
+
+Answer: (A)
+
+48. A data engineer needs to import a large table or incremental records from a traditional relational database into Hadoop. Which tool was specifically designed for bulk data transfer between relational databases and Hadoop?
+
+(A) Apache Flume  
+(B) Apache Sqoop  
+(C) Apache Storm  
+(D) Apache Airflow  
+
+Answer: (B)
+
+49. A Hive query repeatedly reads many small files, increasing file-opening and metadata overhead. Which approach can help address this problem?
+
+(A) Create more tiny files  
+(B) Compact or rewrite the data into appropriately sized files, using a suitable storage format  
+(C) Increase the number of columns without changing the files  
+(D) Disable all query filters  
+
+Answer: (B)
+
+50. A capstone project ingests events through Kafka, processes them using Spark Structured Streaming, stores results in HDFS, and uses Airflow for orchestration. Which statement is correct?
+
+(A) Airflow must trigger every individual Kafka message  
+(B) Spark Structured Streaming can consume Kafka directly; Airflow can orchestrate deployments, supporting jobs, and related batch workflows without needing to launch a new streaming job for every event  
+(C) HDFS cannot store output from Spark Structured Streaming  
+(D) Kafka and Spark cannot be used together  
+
+Answer: (B)
+
+
+  Section 1: Big Data Fundamentals and Hadoop
+
+1. Which of the following is NOT one of the classic “Vs” of Big Data?
+
+A) Volume B) Velocity C) Vision D) Variety
+
+Answer: C. The commonly cited Vs include Volume, Velocity, Variety, Veracity, and Value.
+
+2. What is the default HDFS block size in standard Hadoop 2.x/3.x configurations?
+
+A) 64 MB B) 128 MB C) 256 MB D) 32 MB
+
+Answer: B. The standard default is 128 MiB, although administrators can configure a different block size.
+
+3. What is the default HDFS replication factor in a standard configuration?
+
+A) 1 B) 2 C) 3 D) 5
+
+Answer: C. Three replicas provide fault tolerance by storing copies of each block on multiple DataNodes.
+
+4. Which Hadoop daemon manages HDFS metadata, including the file system namespace and file-to-block mappings?
+
+A) DataNode B) NameNode C) NodeManager D) ResourceManager
+
+Answer: B. The NameNode manages metadata; DataNodes store the actual data blocks.
+
+5. What is the primary purpose of the Secondary NameNode?
+
+A) Act as a hot standby for automatic failover B) Store an additional copy of every HDFS block C) Periodically merge the fsimage and edit logs to create checkpoints D) Schedule MapReduce jobs
+
+Answer: C. The Secondary NameNode performs checkpointing. It is not a standby NameNode; high availability uses Active and Standby NameNodes.
+
+6. With a replication factor of three and the default rack-aware placement policy, which placement is typical?
+
+A) All three replicas on the same rack B) One replica on the local node and two on another rack, with the second and third replicas on different racks C) All three replicas on different racks in every configuration D) All replicas on random nodes without rack awareness
+
+Answer: B. The typical policy balances fault tolerance and network traffic; exact placement depends on cluster topology and available nodes.
+
+7. A Hadoop cluster stores millions of 100 KB files, and the NameNode is running out of memory. What is the likely root cause?
+
+A) DataNodes have insufficient disk space B) Excessive file and block metadata consumes NameNode heap memory C) The replication factor is too low D) YARN has too many containers
+
+Answer: B. Small files create substantial metadata overhead. Combining files into larger files or using suitable storage formats can help.
+
+8. How does the NameNode detect a failed DataNode?
+
+A) The client reports the failure B) The NameNode stops receiving heartbeats from the DataNode C) The Secondary NameNode deletes it D) The Hive Metastore reports it
+
+Answer: B. After the configured timeout, the NameNode marks the DataNode as dead and arranges replication of under-replicated blocks.
+
+9. Which components support automatic NameNode failover in an HDFS High Availability configuration?
+
+A) Secondary NameNode and Oozie B) JournalNodes and ZooKeeper-based failover control C) Hive Metastore and Kafka D) ResourceManager and NodeManager only
+
+Answer: B. JournalNodes share edit logs, while ZooKeeper and the ZooKeeper Failover Controller coordinate automatic failover.
+
+10. Which command uploads a local file into HDFS?
+
+A) `hdfs dfs -get file.txt /data/` B) `hdfs dfs -cat file.txt` C) `hdfs dfs -put file.txt /data/` D) `hdfs dfs -du /data/`
+
+Answer: C. The `-put` command uploads a local file to HDFS. The `-get` command downloads files from HDFS.
+
+11. What is the primary role of YARN in Hadoop 2.x/3.x?
+
+A) Distributed file storage B) Cluster resource management and application scheduling C) SQL query execution only D) Message streaming
+
+Answer: B. The ResourceManager and NodeManagers coordinate cluster resources and application execution.
+
+ Section 2: MapReduce
+
+12. What is the correct order of the main MapReduce processing phases?
+
+A) Reduce → Shuffle → Map B) Map → Reduce → Shuffle and Sort C) Map → Shuffle and Sort → Reduce D) Shuffle → Map → Reduce
+
+Answer: C. Mappers generate intermediate key-value pairs, shuffle and sort groups them by key, and reducers process each group.
+
+13. What is the primary purpose of a MapReduce Combiner?
+
+A) Join two unrelated datasets B) Perform local aggregation to reduce intermediate data transferred during shuffle C) Replace the reducer in every job D) Replicate HDFS blocks
+
+Answer: B. A combiner performs optional local aggregation. The operation must be safe under the framework's execution semantics; it is not guaranteed to run.
+
+14. A MapReduce job has 99% of reducers finishing quickly, but one reducer runs for hours. What is the most likely cause?
+
+A) Too many input files B) Data skew caused by one or more keys receiving disproportionate data C) Low HDFS replication D) A failed NameNode
+
+Answer: B. Inspect key distribution and reducer input sizes. Depending on the job, use aggregation, a custom partitioner, or key salting.
+
+15. What primarily determines the number of map tasks in a typical Hadoop MapReduce job?
+
+A) The number of reducers B) The number of input splits C) The HDFS replication factor D) The number of Hive databases
+
+Answer: B. Hadoop generally creates one map task per input split, with the actual split count determined by the input format and configuration.
+
+ Section 3: HBase
+
+16. Which description best fits Apache HBase?
+
+A) A relational database designed primarily for complex SQL joins B) A distributed, column-family NoSQL database supporting random reads and writes C) A batch-processing engine D) A message queue
+
+Answer: B. HBase supports low-latency access to large, sparse datasets organized by row key and column family.
+
+17. A business needs millisecond-level lookups of customer profiles by customer ID across billions of records. Which technology is the best fit?
+
+A) Hive B) MapReduce C) HBase D) Plain HDFS text files
+
+Answer: C. HBase is designed for random row-level access, while Hive and MapReduce are more suitable for analytical and batch processing.
+
+18. Which factor most directly determines how HBase data is organized and accessed?
+
+A) Column name B) Row key C) HDFS replication factor D) Hive partition name
+
+Answer: B. Row keys determine row ordering and lookup behavior. Poorly designed sequential keys can create write hotspots.
+
+ Section 4: Hive and SQL Analytics
+
+19. Which schema approach is commonly associated with Hive?
+
+A) Schema-on-write only B) Schema-on-read C) No schema under any circumstances D) Schema-on-delete
+
+Answer: B. Hive commonly applies table schema when data is read, although data can also be validated and transformed during ingestion.
+
+20. What normally happens when an external Hive table is dropped?
+
+A) Both metadata and underlying data are always deleted B) Only the data is deleted C) The table metadata is removed while the underlying data is retained D) The entire HDFS cluster is deleted
+
+Answer: C. An external table generally leaves its underlying files intact when dropped, unlike a managed table under the applicable table and configuration semantics.
+
+21. What does the Hive Metastore primarily store?
+
+A) The actual contents of every table B) Table schemas, partition metadata, storage locations, and related information C) YARN container logs only D) Kafka consumer offsets only
+
+Answer: B. The Metastore provides metadata used by Hive and compatible query engines.
+
+22. A 5 TB Hive table is frequently queried using `WHERE sale_date = '2026-08-15'`. Which design can reduce the amount of data scanned?
+
+A) Increase HDFS replication B) Partition the table by `sale_date` C) Convert the table to a managed table without changing its layout D) Add more columns
+
+Answer: B. Partition pruning allows Hive to skip partitions that do not match the filter.
+
+23. What is the difference between partitioning and bucketing in Hive?
+
+A) Partitioning organizes data into directories by partition values; bucketing distributes rows into a fixed number of buckets, commonly using a hash B) Both always produce identical layouts C) Bucketing creates database schemas, while partitioning creates indexes D) Partitioning is available only for external tables
+
+Answer: A. Partitioning helps eliminate irrelevant data, while bucketing can help with certain joins and sampling operations.
+
+24. What is the difference between `ORDER BY` and `SORT BY` in Hive?
+
+A) Both always produce a global order B) `ORDER BY` provides a global ordering; `SORT BY` sorts within individual reducer outputs C) `SORT BY` always produces a global order D) Neither sorts query results
+
+Answer: B. A global sort can be expensive because it requires coordinated ordering, whereas `SORT BY` provides only local ordering.
+
+25. When is a map-side or broadcast-style join especially useful?
+
+A) Both tables are too large to fit in memory B) One table is small enough to be distributed to the workers processing the larger table C) The tables have no join condition D) Every join requires a single reducer
+
+Answer: B. A small lookup table can be broadcast to avoid shuffling the large table, provided the memory and join semantics are suitable.
+
+26. Which file formats are columnar and commonly used for analytical workloads in Hive?
+
+A) Plain CSV and XML B) ORC and Parquet C) Plain text and JSON only D) HTML and XML
+
+Answer: B. ORC and Parquet support column pruning and compression; they can also enable predicate pushdown depending on the query engine and operation.
+
+27. Which statement correctly distinguishes ETL from ELT?
+
+A) ETL transforms after loading, while ELT transforms before loading B) ETL transforms before loading into the target, while ELT loads data first and transforms it within the target environment C) Both prohibit data transformation D) ELT is used only for streaming
+
+Answer: B. ELT is common in cloud data platforms that provide scalable compute for transformations.
+
+28. Which statement best describes a data lake compared with a traditional data warehouse?
+
+A) A data lake stores only clean relational tables B) A data lake can retain raw data in multiple formats, while a warehouse typically provides curated, structured data for analysis C) A warehouse cannot contain historical data D) A data lake and warehouse are always identical
+
+Answer: B. Modern architectures can combine both, and the schema and governance approach depends on the platform and design.
+
+ Section 5: Airflow, ETL and Data Modeling
+
+29. In Apache Airflow, what is a DAG?
+
+A) A database engine B) A Directed Acyclic Graph defining tasks and their dependencies C) A type of HDFS block D) A Kafka topic
+
+Answer: B. A DAG describes the workflow and task dependency structure; the scheduler determines when eligible tasks run.
+
+30. What does an Airflow Sensor do?
+
+A) Encrypts HDFS blocks B) Waits for an external condition, such as a file arrival or API status C) Stores every database record D) Trains machine-learning models automatically
+
+Answer: B. Sensors allow downstream tasks to run only after a specified condition is met.
+
+31. What is the role of an Airflow Hook?
+
+A) Define task dependencies B) Provide a reusable interface for connecting to an external system C) Replace the scheduler D) Store all DAG output data
+
+Answer: B. Hooks encapsulate connection logic and often use Airflow Connections to retrieve configuration and credentials.
+
+32. An Airflow DAG has historical scheduling intervals, and `catchup=True` is configured. What can happen when the DAG is enabled?
+
+A) All previous runs are automatically disabled B) Airflow can create runs for eligible historical intervals that have not yet been processed C) The DAG must fail to parse D) Only one task can execute
+
+Answer: B. Catchup behavior depends on the DAG's start date, timetable, current data interval, and Airflow configuration.
+
+33. An Airflow ETL task is retried after a failure and inserts duplicate records. Which design principle was missed?
+
+A) Data compression B) Idempotency C) Rack awareness D) Model regularization
+
+Answer: B. Design tasks to be safely rerunnable, for example by using deterministic partition overwrites, upserts, or unique business keys.
+
+ Section 6: Apache Spark
+
+34. Why can Spark be faster than traditional MapReduce for iterative workloads?
+
+A) It always uses more disk storage B) It can reuse cached intermediate data and optimize multi-stage execution C) It does not require distributed processing D) It eliminates all network communication
+
+Answer: B. Caching and execution optimizations can reduce repeated computation and disk I/O.
+
+35. Which of the following is a Spark action?
+
+A) `map()` B) `filter()` C) `collect()` D) `flatMap()`
+
+Answer: C. Actions such as `collect()`, `count()`, and writes trigger execution of the required computation.
+
+36. What does lazy evaluation mean in Spark?
+
+A) Every transformation runs immediately B) Transformations build a computation plan that is executed when an action requires the result C) Jobs are always delayed by one hour D) Spark ignores transformation logic
+
+Answer: B. Lazy evaluation allows Spark to optimize the execution plan before processing the data.
+
+37. Which RDD operation typically requires a shuffle?
+
+A) `map()` B) `filter()` C) `reduceByKey()` D) `flatMap()`
+
+Answer: C. `reduceByKey()` redistributes values by key, although local aggregation can reduce the amount of data transferred.
+
+38. Why is `reduceByKey()` usually preferred over `groupByKey()` for aggregation?
+
+A) It collects all data at the driver B) It combines values locally before shuffling, reducing network traffic C) It eliminates the need for keys D) It always uses a single partition
+
+Answer: B. Local combining is more efficient for associative aggregation than transferring every value to be grouped.
+
+39. What is a key advantage of Spark DataFrames over low-level RDDs for structured data processing?
+
+A) DataFrames cannot be optimized B) DataFrames have a schema and benefit from query planning and execution optimizations C) DataFrames cannot execute SQL D) DataFrames cannot be cached
+
+Answer: B. Spark SQL's Catalyst optimizer and execution engine optimize many DataFrame operations.
+
+40. A Spark job joins a 2 TB fact table with a 5 MB lookup table. The join is spending substantial time shuffling data. What should you consider?
+
+A) Increase HDFS replication B) Broadcast the small lookup DataFrame C) Replace every join with `groupByKey()` D) Collect the entire fact table to the driver
+
+Answer: B. A broadcast join can avoid shuffling the large table if the lookup table fits safely in executor memory and the join is compatible.
+
+41. A Spark application throws `OutOfMemoryError` on the driver after calling `.collect()` on a huge DataFrame. What is the best response?
+
+A) Call `collect()` repeatedly B) Avoid collecting all rows; aggregate or filter first, or write the result to distributed storage C) Disable all executors D) Increase the HDFS replication factor
+
+Answer: B. `collect()` transfers all result rows to driver memory. Use it only when the result is small enough to fit safely.
+
+42. What is the difference between Spark `repartition()` and `coalesce()`?
+
+A) `coalesce()` always performs a full shuffle B) `repartition()` performs a shuffle and can increase or decrease partitions; `coalesce()` usually reduces partitions without a full shuffle C) They are identical in every respect D) `repartition()` is available only for RDDs
+
+Answer: B. Use `repartition()` when redistributing data is important; use `coalesce()` when reducing partition count without a full shuffle is appropriate.
+
+43. What is the default storage level used by `cache()` on a Spark SQL DataFrame in modern Spark versions?
+
+A) Disk only B) `MEMORY_AND_DISK` C) Permanent HDFS storage D) No storage
+
+Answer: B. The default DataFrame cache storage level is `MEMORY_AND_DISK`; persistence behavior for other APIs and versions may differ.
+
+44. You need the top three highest-paid employees in each department. Which SQL approach is appropriate?
+
+A) `GROUP BY department` with `MAX(salary)` only B) `ROW_NUMBER()` or `DENSE_RANK()` over each department, ordered by salary descending C) A global `ORDER BY salary LIMIT 3` D) A cross join
+
+Answer: B. Window functions support per-department ranking. Use `ROW_NUMBER()` for at most three rows per department, or `DENSE_RANK()` when ties should share a rank.
+
+45. In Spark on YARN, what is the difference between client and cluster deploy modes?
+
+A) There is no difference B) Client mode runs the driver on the submitting machine; cluster mode runs the driver inside the cluster C) Cluster mode has no driver D) Client mode cannot use executors
+
+Answer: B. Cluster mode is often useful for production submissions because the driver does not depend on the submitting client remaining connected.
+
+46. In Spark ML pipelines, what distinguishes an Estimator from a Transformer?
+
+A) An Estimator learns from data using `fit()`; a Transformer applies a transformation using `transform()` B) An Estimator only reads files, while a Transformer only writes files C) Both are cluster managers D) Neither can be part of a pipeline
+
+Answer: A. For example, `LogisticRegression` is an Estimator, and the fitted logistic regression model is a Transformer.
+
+ Section 7: Kafka and Streaming
+
+47. Within Kafka, where is message ordering guaranteed?
+
+A) Across the entire topic in every configuration B) Within a single partition C) Across every partition automatically D) Nowhere
+
+Answer: B. Related events can be keyed so they are routed to the same partition, where their order is maintained.
+
+48. In a Kafka consumer group, how are partitions assigned during normal consumption?
+
+A) Each partition is assigned to at most one consumer in the group at a time B) Every consumer reads every partition C) Every message is automatically sent to all consumers in the group D) A consumer can read only one message ever
+
+Answer: A. Partition assignment allows parallel consumption while preventing multiple group members from normally owning the same partition simultaneously.
+
+49. What is Apache Kafka Connect used for?
+
+A) Training neural networks B) Integrating Kafka with external systems through source and sink connectors C) Replacing every Kafka broker D) Providing an HDFS NameNode
+
+Answer: B. Source connectors import data into Kafka; sink connectors export data from Kafka to external systems.
+
+50. A bank needs near-real-time fraud detection on card transactions. Which architecture is the best fit?
+
+A) A nightly Hive batch job only B) Kafka ingestion, Spark Structured Streaming processing, fraud rules or a trained model, and an alert sink C) Manual CSV uploads once a week D) A monthly Sqoop import
+
+Answer: B. Kafka buffers and distributes events, while a streaming engine processes them continuously. End-to-end latency depends on the design and configuration.
+
+ Section 8: Advanced Spark Scenarios and Optimization
+
+51.  A Spark application frequently fails with executor `OutOfMemoryError` while processing a large aggregation. Spark UI shows high memory usage and substantial garbage collection. What should you investigate first?
+
+A) Increase the HDFS replication factor B) Inspect executor memory, aggregation size, partition distribution, and garbage collection; then tune partitioning and memory usage C) Run `collect()` before the aggregation D) Disable all shuffle operations
+
+Answer: B. Executor memory pressure may result from oversized partitions, large aggregation state, or inefficient data structures. Diagnose the cause before changing resource settings.
+
+52.  A Spark DataFrame is partitioned by date during a write, but thousands of small files appear in each date folder. What is the best approach?
+
+A) Reduce HDFS replication B) Control the number and distribution of output partitions before writing, using appropriate repartitioning or coalescing C) Replace Parquet with JSON D) Restart the Hive Metastore
+
+Answer: B. Too many writer tasks can create excessive files. Choose output partition counts based on data volume and desired file sizes, while avoiding partitioning strategies that create new bottlenecks.
+
+53.  A Spark job repeatedly scans the same large source dataset for three independent reports. The source is expensive to read and transform. Which optimization should you consider?
+
+A) Recompute the entire source for every report B) Cache or persist the shared intermediate DataFrame and reuse it across the reports C) Convert every DataFrame to a Python list D) Call `collect()` on the source
+
+Answer: B. Persisting reusable intermediate data can avoid repeated computation. Confirm that memory and storage costs are justified, and unpersist the data when it is no longer needed.
+
+54.  A customer table contains multiple updates per `user_id`. You must retain the latest complete record using `updated_at`. Which SQL approach is correct?
+
+A) Group by `user_id` and select every non-aggregated column without a defined rule B) Apply `ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY updated_at DESC)` and retain row number 1 C) Sort the entire table and keep the first row globally D) Apply `DISTINCT` to every column
+
+Answer: B. A window function selects one latest row per user. Add a deterministic tie-breaker if multiple records share the same timestamp.
+
+55.  A product team wants to calculate each product's day-over-day sales change. Which SQL function is most appropriate?
+
+A) `RANK()` B) `LAG(sales) OVER (PARTITION BY product_id ORDER BY sale_date)` C) `COUNT(*)` D) `NTILE(4)`
+
+Answer: B. `LAG()` retrieves the previous row's sales within each product's ordered history. Subtract the previous value from the current value to calculate the change.
+
+ Section 9: Kafka Reliability and Structured Streaming
+
+56.  A Kafka producer must avoid acknowledging a write until the replicated record has been safely accepted by the required in-sync replicas. Which configuration is most appropriate for strong durability?
+
+A) `acks=0` and replication factor 1 B) `acks=1` with no consideration of replica availability C) `acks=all`, a suitable replication factor, and an appropriate `min.insync.replicas` setting D) Disable replication and retries
+
+Answer: C. `acks=all` waits for the current in-sync replicas to acknowledge the write. A suitable `min.insync.replicas` setting controls how many in-sync replicas must be available for writes to succeed. Producer idempotence can further reduce duplicate writes caused by retries.
+
+57.  A Kafka consumer crashes after processing a message but before committing its offset. The message is processed again after restart. How should the downstream system handle this safely?
+
+A) Disable all offset commits permanently B) Make the sink idempotent, using upserts or deduplication based on a unique event identifier C) Reduce the number of Kafka brokers D) Increase the replication factor only
+
+Answer: B. At-least-once processing can produce duplicate deliveries. An idempotent sink prevents repeated processing from creating duplicate business results.
+
+58.  A Spark Structured Streaming job calculates five-minute event-time counts. Events may arrive up to ten minutes late, and aggregation state grows continuously. What should you do?
+
+A) Call `collect()` in every micro-batch B) Define an appropriate watermark, such as `withWatermark("event_time", "10 minutes")`, and use supported window aggregation semantics C) Remove event timestamps D) Increase the trigger interval to several days
+
+Answer: B. Watermarks allow Spark to finalize eligible event-time windows and clean up old state. Events arriving beyond the watermark may be excluded from stateful results, depending on the operation.
+
+59.  A Spark Structured Streaming application restarts after a failure and needs to recover its processed offsets and state. What is essential?
+
+A) A larger driver only B) A stable `checkpointLocation` on reliable storage C) A Hive database with no checkpoint D) A larger Kafka message size
+
+Answer: B. A checkpoint records streaming progress and state needed for recovery. The checkpoint location must remain stable across restarts of the same query.
+
+ Section 10: Hive and HDFS Operations
+
+60.  A Hive table uses transactional ACID storage. A large number of updates and deletes have produced many delta files, and query performance has deteriorated. What should you investigate?
+
+A) Increase HDFS replication to 10 B) Hive ACID compaction and transaction-related configuration C) Format the NameNode D) Drop the database without a backup
+
+Answer: B. Compaction consolidates transactional files, reducing the overhead of reading many delta files. The exact procedure depends on the Hive version and table configuration.
+
+61.  An upstream process creates new date-partition directories directly under an external Hive table's HDFS location. The new records are not visible in queries. What should you do?
+
+A) Drop the entire database B) Register the partitions using `MSCK REPAIR TABLE table_name` or suitable `ALTER TABLE ... ADD PARTITION` statements C) Delete all HDFS files D) Restart every DataNode
+
+Answer: B. Hive needs partition metadata to discover externally created partition directories when they have not been registered automatically.
+
+62.  After a NameNode restart, users can read HDFS files but cannot write new ones. The NameNode web interface reports that safe mode is enabled. What does this mean?
+
+A) The cluster is permanently corrupted B) The NameNode is protecting the file system while it waits for sufficient block reports and safe-mode conditions C) YARN has necessarily crashed D) All HDFS blocks have been deleted
+
+Answer: B. Check DataNode health, block reports, and safe-mode status. Leave safe mode only after understanding why it remains enabled.
+
+63.  Five new DataNodes have been added to a cluster, but old DataNodes are 90% full while the new nodes are nearly empty. Which utility can help redistribute blocks?
+
+A) `hdfs balancer` B) `hdfs fsck -delete` C) `hdfs dfs -expunge` D) `hdfs namenode -format`
+
+Answer: A. The HDFS Balancer redistributes block replicas to improve storage utilization. Never format a live NameNode as a balancing solution.
+
+64.  An analytics platform changes a Parquet dataset by adding a new nullable column. Some older files do not contain that column. What should the data engineer do?
+
+A) Assume every reader will always infer the same schema automatically B) Manage schema evolution explicitly and verify the reader's schema-merging and compatibility behavior C) Delete every older data file D) Convert all records to separate JSON files
+
+Answer: B. Schema evolution depends on the table format, catalog, reader, and configuration. Validate compatibility so older files can be queried correctly alongside newer files.
+
+ Section 11: Airflow, Data Quality and Warehousing
+
+65.  A file arrives at an unpredictable time between 2 AM and 6 AM. An Airflow sensor occupies a worker slot for hours, starving other tasks. What is the best solution?
+
+A) Use a six-hour `sleep()` in a Python task B) Use sensor `reschedule` mode or a compatible deferrable operator C) Remove the sensor and assume the file exists D) Set retries to 1,000
+
+Answer: B. Reschedule mode releases the worker slot between checks; deferrable operators can suspend work and use the triggerer for asynchronous waiting.
+
+66.  A developer has hard-coded a database password in a DAG file committed to Git. What is the correct practice?
+
+A) Keep it because the repository is private B) Store credentials in Airflow Connections or an approved secrets backend C) Put the password in a code comment D) Base64-encode the password in the DAG
+
+Answer: B. Secrets should be managed securely and referenced through approved connection mechanisms. Base64 encoding does not provide encryption.
+
+67.  An incoming order batch contains 3% of records with a null `customer_id`. The business needs clean reports but does not want the invalid records lost. What is the best design?
+
+A) Silently discard the entire batch B) Load valid records into the main table, route invalid records to a quarantine table, and alert the appropriate team C) Generate random customer IDs for invalid records D) Ignore the problem because only 3% of records are affected
+
+Answer: B. Quarantine preserves evidence for investigation while protecting downstream reports from invalid data.
+
+68.  A customer changes their address, but the business needs historical reports to show the address that was valid when each order was placed. Which data warehouse technique fits best?
+
+A) Slowly Changing Dimension Type 1, which overwrites the old value B) Slowly Changing Dimension Type 2, which retains historical versions with effective dates or current flags C) Delete every historical order D) Store only the customer's latest address
+
+Answer: B. SCD Type 2 preserves history. Fact records must be associated with the appropriate dimension version for historical reporting.
+
+ Section 12: Data Science, Machine Learning and Cloud
+
+69.  A fraud detection model achieves 99.5% accuracy on a dataset where only 0.5% of transactions are fraudulent, but it fails to flag any fraud. What is the main issue?
+
+A) The model is perfect B) Class imbalance makes accuracy misleading; evaluate precision, recall, F1 and PR-AUC, and consider class weights or resampling C) Accuracy is the only useful classification metric D) The dataset cannot be used for machine learning
+
+Answer: B. Predicting every transaction as legitimate can produce 99.5% accuracy in this example while detecting no fraud. Select metrics based on business costs and the precision-recall trade-off.
+
+70.  A nightly Spark ETL job requires two hours of compute, but the team leaves a large EMR or Databricks cluster running 24/7. What is the best cost optimization?
+
+A) Add more nodes and keep them running B) Use job or ephemeral clusters, automatic termination, appropriate autoscaling, and spot capacity where interruption is acceptable C) Disable logging and data replication indiscriminately D) Move all processing to one machine regardless of data volume
+
+Answer: B. Matching compute capacity to the workload reduces idle costs. Spot instances can lower costs further, but interruption handling and data durability must be considered.
+
+ Final interview preparation checklist
+
+ Revision tracker
+
+0 of 8 topics
+
+Hadoop and MapReduce
+
+Q1–15
+
+HBase and Hive
+
+Q16–26
+
+ETL, Airflow and modeling
+
+Q27–33
+
+Spark fundamentals
+
+Q34–46
+
+Kafka and streaming
+
+Q47–59
+
+Hive and HDFS operations
+
+Q60–64
+
+Data quality and Airflow
+
+Q65–68
+
+Machine learning and cloud
+
+Q69–70
+
+How to answer scenario-based interview questions
+
+1. Identify the root cause.
+2. Explain the technical solution and why it works.
+3. Mention the trade-off and how you would verify the result using logs, metrics, query plans, or the Spark UI.

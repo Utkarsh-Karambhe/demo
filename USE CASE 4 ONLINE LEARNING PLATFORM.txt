@@ -1,0 +1,474 @@
+USE CASE 4: ONLINE LEARNING PLATFORM ANALYTICS USING HIVE
+==========================================================
+
+Environment: Ubuntu / WSL
+
+Technologies: Hadoop HDFS + Hive + HiveQL
+
+
+------------------------------------------------
+1. START HADOOP
+------------------------------------------------
+
+Start HDFS:
+
+start-dfs.sh
+
+Start YARN:
+
+start-yarn.sh
+
+Check services:
+
+jps
+
+
+------------------------------------------------
+2. CREATE PROJECT DIRECTORY
+------------------------------------------------
+
+mkdir -p ~/online-learning-analytics
+
+cd ~/online-learning-analytics
+
+
+------------------------------------------------
+3. CREATE LEARNERS CSV FILE
+------------------------------------------------
+
+nano learners.csv
+
+Enter:
+
+L001,Aarav,Pune
+L002,Priya,Mumbai
+L003,Rahul,Delhi
+L004,Neha,Bangalore
+L005,Amit,Chennai
+L006,Sneha,Nashik
+
+Save:
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+------------------------------------------------
+4. CREATE COURSES CSV FILE
+------------------------------------------------
+
+nano courses.csv
+
+Enter:
+
+C001,Python
+C002,Java
+C003,BigData
+C004,Cloud
+C005,MachineLearning
+
+Save:
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+------------------------------------------------
+5. CREATE ENROLLMENTS CSV FILE
+------------------------------------------------
+
+nano enrollments.csv
+
+Enter:
+
+E001,L001,C001,2026-08-01
+E002,L001,C003,2026-08-02
+E003,L002,C002,2026-08-03
+E004,L002,C003,2026-08-04
+E005,L003,C001,2026-08-05
+E006,L003,C004,2026-08-06
+E007,L004,C005,2026-08-07
+E008,L005,C002,2026-08-08
+E009,L005,C003,2026-08-09
+
+Save:
+
+Ctrl + O
+Enter
+Ctrl + X
+
+
+------------------------------------------------
+6. VERIFY LOCAL FILES
+------------------------------------------------
+
+ls
+
+Check learners:
+
+cat learners.csv
+
+Check courses:
+
+cat courses.csv
+
+Check enrollments:
+
+cat enrollments.csv
+
+
+------------------------------------------------
+7. CREATE HDFS DIRECTORIES
+------------------------------------------------
+
+hdfs dfs -mkdir -p /online_learning/raw/learners
+
+hdfs dfs -mkdir -p /online_learning/raw/courses
+
+hdfs dfs -mkdir -p /online_learning/raw/enrollments
+
+
+------------------------------------------------
+8. PUT RAW DATA INTO HDFS
+------------------------------------------------
+
+Upload learners:
+
+hdfs dfs -put learners.csv /online_learning/raw/learners/
+
+Upload courses:
+
+hdfs dfs -put courses.csv /online_learning/raw/courses/
+
+Upload enrollments:
+
+hdfs dfs -put enrollments.csv /online_learning/raw/enrollments/
+
+
+------------------------------------------------
+9. VERIFY HDFS DATA
+------------------------------------------------
+
+hdfs dfs -ls /online_learning/raw/learners
+
+hdfs dfs -ls /online_learning/raw/courses
+
+hdfs dfs -ls /online_learning/raw/enrollments
+
+
+------------------------------------------------
+10. READ DATA FROM HDFS
+------------------------------------------------
+
+hdfs dfs -cat /online_learning/raw/learners/learners.csv
+
+hdfs dfs -cat /online_learning/raw/courses/courses.csv
+
+hdfs dfs -cat /online_learning/raw/enrollments/enrollments.csv
+
+
+------------------------------------------------
+11. START HIVE
+------------------------------------------------
+
+hive
+
+
+------------------------------------------------
+12. CREATE HIVE DATABASE
+------------------------------------------------
+
+CREATE DATABASE online_learning_db;
+
+
+------------------------------------------------
+13. USE DATABASE
+------------------------------------------------
+
+USE online_learning_db;
+
+
+------------------------------------------------
+14. CREATE MANAGED TABLE FOR LEARNERS
+------------------------------------------------
+
+CREATE TABLE learners (
+    learner_id STRING,
+    learner_name STRING,
+    city STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE;
+
+
+------------------------------------------------
+15. CHECK MANAGED TABLE
+------------------------------------------------
+
+SHOW TABLES;
+
+DESCRIBE learners;
+
+
+------------------------------------------------
+16. LOAD DATA USING LOCAL INPATH
+------------------------------------------------
+
+LOAD DATA LOCAL INPATH '/home/Srushti_ubuntu/online-learning-analytics/learners.csv'
+INTO TABLE learners;
+
+
+------------------------------------------------
+17. VERIFY MANAGED TABLE DATA
+------------------------------------------------
+
+SELECT * FROM learners;
+
+
+------------------------------------------------
+18. CREATE EXTERNAL TABLE FOR COURSES
+------------------------------------------------
+
+CREATE EXTERNAL TABLE courses (
+    course_id STRING,
+    course_name STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/online_learning/raw/courses';
+
+
+------------------------------------------------
+19. CHECK EXTERNAL TABLE
+------------------------------------------------
+
+DESCRIBE courses;
+
+SELECT * FROM courses;
+
+
+------------------------------------------------
+20. CREATE EXTERNAL TABLE FOR ENROLLMENTS
+------------------------------------------------
+
+CREATE EXTERNAL TABLE enrollments (
+    enrollment_id STRING,
+    learner_id STRING,
+    course_id STRING,
+    enrollment_date DATE
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/online_learning/raw/enrollments';
+
+
+------------------------------------------------
+21. CHECK ENROLLMENT TABLE
+------------------------------------------------
+
+DESCRIBE enrollments;
+
+SELECT * FROM enrollments;
+
+
+------------------------------------------------
+22. LOAD DATA USING HDFS INPATH
+------------------------------------------------
+
+For demonstrating LOAD DATA INPATH, first create another HDFS location:
+
+Exit Hive:
+
+quit;
+
+Create directory:
+
+hdfs dfs -mkdir -p /online_learning/load/courses
+
+Copy courses file:
+
+hdfs dfs -cp /online_learning/raw/courses/courses.csv /online_learning/load/courses/
+
+Start Hive again:
+
+hive
+
+USE online_learning_db;
+
+
+------------------------------------------------
+23. CREATE ANOTHER MANAGED TABLE
+------------------------------------------------
+
+CREATE TABLE courses_loaded (
+    course_id STRING,
+    course_name STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE;
+
+
+------------------------------------------------
+24. LOAD DATA USING HDFS INPATH
+------------------------------------------------
+
+LOAD DATA INPATH '/online_learning/load/courses/courses.csv'
+INTO TABLE courses_loaded;
+
+
+------------------------------------------------
+25. VERIFY HDFS INPATH LOAD
+------------------------------------------------
+
+SELECT * FROM courses_loaded;
+
+
+------------------------------------------------
+26. INNER JOIN
+------------------------------------------------
+
+Find which learners are enrolled in which courses:
+
+SELECT
+    l.learner_id,
+    l.learner_name,
+    c.course_id,
+    c.course_name
+FROM learners l
+INNER JOIN enrollments e
+ON l.learner_id = e.learner_id
+INNER JOIN courses c
+ON e.course_id = c.course_id;
+
+
+------------------------------------------------
+27. COUNT ENROLLMENTS BY COURSE
+------------------------------------------------
+
+SELECT
+    c.course_id,
+    c.course_name,
+    COUNT(e.enrollment_id) AS enrollment_count
+FROM courses c
+LEFT JOIN enrollments e
+ON c.course_id = e.course_id
+GROUP BY c.course_id, c.course_name
+ORDER BY enrollment_count DESC;
+
+
+------------------------------------------------
+28. LEFT OUTER JOIN
+------------------------------------------------
+
+Find learners who have not enrolled in any course:
+
+SELECT
+    l.learner_id,
+    l.learner_name,
+    e.course_id
+FROM learners l
+LEFT OUTER JOIN enrollments e
+ON l.learner_id = e.learner_id
+WHERE e.learner_id IS NULL;
+
+
+------------------------------------------------
+29. RIGHT OUTER JOIN
+------------------------------------------------
+
+Find enrollment records with their learner information:
+
+SELECT
+    l.learner_id,
+    l.learner_name,
+    e.enrollment_id,
+    e.course_id
+FROM learners l
+RIGHT OUTER JOIN enrollments e
+ON l.learner_id = e.learner_id;
+
+
+------------------------------------------------
+30. FULL OUTER JOIN
+------------------------------------------------
+
+Find all learners and all enrollment records:
+
+SELECT
+    l.learner_id,
+    l.learner_name,
+    e.enrollment_id,
+    e.course_id
+FROM learners l
+FULL OUTER JOIN enrollments e
+ON l.learner_id = e.learner_id;
+
+
+------------------------------------------------
+31. FIND COURSES WITH NO LEARNERS
+------------------------------------------------
+
+SELECT
+    c.course_id,
+    c.course_name
+FROM courses c
+LEFT OUTER JOIN enrollments e
+ON c.course_id = e.course_id
+WHERE e.course_id IS NULL;
+
+
+------------------------------------------------
+32. MAP-SIDE JOIN
+------------------------------------------------
+
+The courses table is small compared with a large enrollment table.
+
+Use Hive's MAPJOIN hint:
+
+SELECT /*+ MAPJOIN(c) */
+    e.enrollment_id,
+    e.learner_id,
+    c.course_name
+FROM enrollments e
+JOIN courses c
+ON e.course_id = c.course_id;
+
+
+------------------------------------------------
+33. REDUCE-SIDE JOIN
+------------------------------------------------
+
+Perform a normal JOIN without MAPJOIN:
+
+SELECT
+    e.enrollment_id,
+    e.learner_id,
+    c.course_name
+FROM enrollments e
+JOIN courses c
+ON e.course_id = c.course_id;
+
+
+------------------------------------------------
+34. CREATE PARTITIONED TABLE
+------------------------------------------------
+
+Create an enrollment table partitioned by enrollment year:
+
+CREATE TABLE enrollments_partitioned (
+    enrollment_id STRING,
+    learner_id STRING,
+    course_id STRING
+)
+PARTITIONED BY (
+    enrollment_year INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXT

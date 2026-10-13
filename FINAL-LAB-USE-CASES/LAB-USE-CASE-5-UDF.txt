@@ -1,0 +1,460 @@
+USE CASE 5: Mobile App Activity Log Analytics
+1. Problem Statement
+
+A company operates a mobile application used by thousands of customers every day.
+
+The application generates daily activity logs containing:
+
+User ID
+User name
+Event type
+Device type
+Event date
+Session duration
+
+The data engineering team receives these log files every day and stores them in HDFS.
+
+The company wants to use Hive to analyze the logs and generate reports such as:
+
+Which users generated application activity?
+How many users performed each type of event?
+
+
+//create a custom Hive UDF that converts a user name into uppercase.
+
+//Technology Stack
+Linux / WSL
+Hadoop HDFS
+Hive 3.1.3
+Java 8
+Java UDF
+HiveQL
+
+Architecture:
+
+Mobile Application
+       |
+       v
+Daily Log Files
+       |
+       v
+HDFS Raw Layer
+       |
+       v
+Hive External Table
+       |
+       v
+Hive Query
+       |
+       +---- Custom UDF
+       |
+       v
+Analytics / Reports
+
+
+
+
+###############################################################################################################
+                                           SOLUTION
+###############################################################################################################
+# USE CASE 5
+# MOBILE APP ACTIVITY LOG ANALYTICS
+# HDFS + HIVE + JAVA UDF
+
+
+==================================================
+# 1. FLOW
+==================================================
+
+CSV Log
+   ↓
+HDFS
+   ↓
+Hive External Table
+   ↓
+Custom Java UDF
+   ↓
+Hive Queries
+   ↓
+Reports
+
+
+==================================================
+# 2. CREATE PROJECT
+==================================================
+
+mkdir -p ~/hive-app-logs/data
+
+mkdir -p ~/hive-app-logs/udf
+
+cd ~/hive-app-logs
+
+
+==================================================
+# 3. CREATE LOG FILE
+==================================================
+
+nano data/app_activity.csv
+
+
+# DATA FORMAT
+
+user_id,user_name,event_type,device_type,event_date,session_duration
+
+
+# Example data
+
+U001,rahul,LOGIN,ANDROID,2026-10-01,25
+U002,priya,VIEW,IOS,2026-10-01,40
+U003,amit,LOGIN,ANDROID,2026-10-01,30
+U004,neha,PURCHASE,ANDROID,2026-10-01,55
+U005,kiran,LOGOUT,IOS,2026-10-01,15
+U006,anita,VIEW,ANDROID,2026-10-02,35
+U007,ravi,LOGIN,IOS,2026-10-02,20
+U008,sneha,PURCHASE,ANDROID,2026-10-02,60
+
+
+# CHECK
+
+cat data/app_activity.csv
+
+
+==================================================
+# 4. UPLOAD TO HDFS
+==================================================
+
+hdfs dfs -mkdir -p /mobile-app/raw
+
+hdfs dfs -put -f data/app_activity.csv /mobile-app/raw/
+
+hdfs dfs -ls /mobile-app/raw
+
+hdfs dfs -cat /mobile-app/raw/app_activity.csv
+
+
+==================================================
+# 5. HIVE
+==================================================
+
+beeline -u jdbc:hive2://localhost:10000/default
+
+
+CREATE DATABASE IF NOT EXISTS mobile_app;
+
+USE mobile_app;
+
+
+==================================================
+# 6. CREATE EXTERNAL TABLE
+==================================================
+
+CREATE EXTERNAL TABLE IF NOT EXISTS app_activity (
+    user_id STRING,
+    user_name STRING,
+    event_type STRING,
+    device_type STRING,
+    event_date DATE,
+    session_duration INT
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION '/mobile-app/raw';
+
+
+==================================================
+# 7. VERIFY TABLE
+==================================================
+
+SELECT * FROM app_activity;
+
+SELECT COUNT(*) FROM app_activity;
+
+
+==================================================
+# 8. JAVA UDF
+==================================================
+
+cd ~/hive-app-logs/udf
+
+nano UpperCaseUDF.java
+
+
+# CODE
+
+import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.io.Text;
+
+public class UpperCaseUDF extends UDF {
+
+    public Text evaluate(Text input) {
+
+        if (input == null) {
+            return null;
+        }
+
+        return new Text(input.toString().toUpperCase());
+    }
+}
+
+
+==================================================
+# 9. COMPILE UDF
+==================================================
+
+export HIVE_HOME=/opt/hive
+
+echo $HIVE_HOME
+->/opt/hive
+
+javac -cp "$HIVE_HOME/lib/*:/opt/hadoop/share/hadoop/common/*" UpperCaseUDF.java
+
+ls -lh *.class
+-rw-rw-r-- 1 ubuntu ubuntu 533 Oct  5 06:41 UpperCaseUDF.class
+
+==================================================
+# 10. CREATE JAR
+==================================================
+
+jar -cf uppercase-udf.jar UpperCaseUDF.class
+
+ls -l uppercase-udf.jar
+
+-rw-rw-r-- 1 ubuntu ubuntu 800 Oct  5 06:43 uppercase-udf.jar
+
+==================================================
+# 11. ADD JAR IN HIVE
+==================================================
+
+In Beeline:
+
+ADD JAR /home/ubuntu/hive-app-logs/udf/uppercase-udf.jar;
+
+
+==================================================
+# 12. CREATE HIVE FUNCTION
+==================================================
+
+CREATE FUNCTION uppercase_name
+AS 'UpperCaseUDF';
+
+
+==================================================
+# 13. TEST UDF
+==================================================
+
+SELECT
+    user_name,
+    uppercase_name(user_name)
+FROM app_activity;
+
+
+# Example:
+
+rahul → RAHUL
+priya → PRIYA
+amit  → AMIT
+
+
+==================================================
+# 14. USERS WHO GENERATED ACTIVITY
+==================================================
+
+SELECT DISTINCT
+    user_id,
+    uppercase_name(user_name) AS user_name
+FROM app_activity;
+
++----------+------------+
+| user_id  | user_name  |
++----------+------------+
+| U001     | RAHUL      |
+| U002     | PRIYA      |
+| U003     | AMIT       |
+| U004     | NEHA       |
+| U005     | KIRAN      |
+| U006     | ANITA      |
+| U007     | RAVI       |
+| U008     | SNEHA      |
++----------+------------+
+
+==================================================
+# 15. USERS PER EVENT TYPE
+==================================================
+
+SELECT
+    event_type,
+    COUNT(DISTINCT user_id) AS user_count
+FROM app_activity
+GROUP BY event_type;
+
++-------------+-------------+
+| event_type  | user_count  |
++-------------+-------------+
+| LOGIN       | 3           |
+| LOGOUT      | 1           |
+| PURCHASE    | 2           |
+| VIEW        | 2           |
++-------------+-------------+
+==================================================
+# 19. OPTIONAL FINAL REPORT TABLE
+==================================================
+
+CREATE TABLE app_activity_report AS
+
+SELECT
+    user_id,
+    uppercase_name(user_name) AS user_name,
+    event_type,
+    device_type,
+    event_date,
+    session_duration
+FROM app_activity;
+
+
+==================================================
+# 20. VERIFY FINAL REPORT
+==================================================
+
+SELECT * FROM app_activity_report;
+
+
+==================================================
+# 21. IMPORTANT COMMANDS
+==================================================
+
+# HDFS
+
+hdfs dfs -ls /mobile-app/raw
+
+hdfs dfs -cat /mobile-app/raw/app_activity.csv
+
+
+# Hive
+
+USE mobile_app;
+
+SHOW TABLES;
+
+SELECT * FROM app_activity;
+
+
+# UDF
+
+ADD JAR /home/siddhi/hive-app-logs/udf/uppercase-udf.jar;
+
+CREATE FUNCTION uppercase_name
+AS 'UpperCaseUDF';
+
+
+==================================================
+# 22. IMPORTANT UDF LOGIC
+==================================================
+
+Java:
+
+input
+ ↓
+toUpperCase()
+ ↓
+Text output
+
+
+Hive:
+
+uppercase_name(user_name)
+
+
+rahul
+ ↓
+RAHUL
+
+
+==================================================
+# 23. EXAM FLOW
+==================================================
+
+CSV
+ ↓
+HDFS
+ ↓
+External Hive Table
+ ↓
+Java UDF
+ ↓
+ADD JAR
+ ↓
+CREATE FUNCTION
+ ↓
+Hive Analytics
+
+
+==================================================
+# 24. REQUIREMENTS CHECK
+==================================================
+
+✓ Store logs in HDFS
+
+✓ Create Hive External Table
+
+✓ Read/analyze logs using Hive
+
+✓ Create custom Java UDF
+
+✓ Convert user names to uppercase
+
+✓ Count users by event type
+
+✓ Calculate average session duration
+
+✓ Standardize user names
+
+✓ Generate Hive report
+
+
+==================================================
+# 25. EXAM MEMORY
+==================================================
+
+HDFS:
+hdfs dfs -put
+
+Hive:
+CREATE EXTERNAL TABLE
+
+Java UDF:
+extends UDF
+
+Compile:
+javac
+
+JAR:
+jar -cf
+
+Load:
+ADD JAR
+
+Register:
+CREATE FUNCTION
+
+Use:
+uppercase_name(user_name)
+
+
+==================================================
+# MAIN UDF COMMAND FLOW
+==================================================
+
+Java File
+   ↓
+javac
+   ↓
+.class
+   ↓
+.jar
+   ↓
+ADD JAR
+   ↓
+CREATE FUNCTION
+   ↓
+Hive Query

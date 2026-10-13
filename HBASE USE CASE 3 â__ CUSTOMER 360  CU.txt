@@ -1,0 +1,468 @@
+HBASE USE CASE 3 — CUSTOMER 360 / CUSTOMER PROFILE
+==================================================
+
+Project: Customer 360 / Customer Profile
+
+Environment: Ubuntu / WSL
+
+Technologies: HBase + HDFS + Hadoop
+
+
+------------------------------------------------
+1. PROJECT OBJECTIVE
+------------------------------------------------
+
+A telecom company has millions of customers and needs very fast access to customer information.
+
+The system stores:
+
+Customer ID
+Customer Name
+City
+Mobile Number
+Plan
+Status
+Data Usage
+
+HBase is suitable because Customer ID is used as the RowKey, allowing fast lookup of an individual customer.
+
+Expected operations:
+
+Create HBase table
+Insert customer data
+Update customer data
+Retrieve one customer
+Retrieve multiple customers
+Delete a column
+Delete a customer
+Count customers
+Describe table
+Disable table
+Drop table
+
+
+------------------------------------------------
+2. REQUIRED COMPONENTS
+------------------------------------------------
+
+HBase       -> NoSQL database
+HDFS        -> Storage layer
+Hadoop      -> Distributed storage/framework
+HBase Shell -> Execute HBase commands
+Java        -> Required by HBase
+
+
+------------------------------------------------
+3. START HADOOP SERVICES
+------------------------------------------------
+
+Start HDFS:
+
+start-dfs.sh
+
+Start YARN:
+
+start-yarn.sh
+
+Check services:
+
+jps
+
+Expected important processes:
+
+NameNode
+DataNode
+SecondaryNameNode
+ResourceManager
+NodeManager
+
+
+------------------------------------------------
+4. START HBASE
+------------------------------------------------
+
+Start HBase:
+
+start-hbase.sh
+
+Check HBase processes:
+
+jps
+
+Expected HBase processes:
+
+HMaster
+HRegionServer
+
+
+------------------------------------------------
+5. OPEN HBASE SHELL
+------------------------------------------------
+
+Run:
+
+hbase shell
+
+You should get:
+
+hbase:001:0>
+
+
+------------------------------------------------
+6. CHECK HBASE VERSION
+------------------------------------------------
+
+version
+
+
+------------------------------------------------
+7. CREATE CUSTOMER TABLE
+------------------------------------------------
+
+Create the table with three column families:
+
+personal
+subscription
+usage
+
+Run:
+
+create 'customer_profiles', 'info'
+
+
+------------------------------------------------
+8. CHECK TABLE
+------------------------------------------------
+
+list
+
+
+------------------------------------------------
+9. DESCRIBE TABLE
+------------------------------------------------
+
+describe 'customer_profiles'
+
+
+------------------------------------------------
+10. INSERT CUSTOMER 1
+------------------------------------------------
+
+put 'customer_profiles', 'CUST1001', 'info:name', 'Rahul'
+
+put 'customer_profiles', 'CUST1001', 'info:city', 'Mumbai'
+
+put 'customer_profiles', 'CUST1001', 'info:mobile', '9876543210'
+
+put 'customer_profiles', 'CUST1001', 'info:plan', '5G Premium'
+
+put 'customer_profiles', 'CUST1001', 'info:status', 'Active'
+
+put 'customer_profiles', 'CUST1001', 'info:data_gb', '25'
+
+
+------------------------------------------------
+11. INSERT CUSTOMER 2
+------------------------------------------------
+
+put 'customer_profiles', 'CUST1002', 'info:name', 'Priya'
+
+put 'customer_profiles', 'CUST1002', 'info:city', 'Pune'
+
+put 'customer_profiles', 'CUST1002', 'info:mobile', '9876543211'
+
+put 'customer_profiles', 'CUST1002', 'info:plan', '5G Basic'
+
+put 'customer_profiles', 'CUST1002', 'info:status', 'Active'
+
+put 'customer_profiles', 'CUST1002', 'info:data_gb', '18'
+
+
+------------------------------------------------
+12. INSERT CUSTOMER 3
+------------------------------------------------
+
+put 'customer_profiles', 'CUST1003', 'info:name', 'Amit'
+
+put 'customer_profiles', 'CUST1003', 'info:city', 'Delhi'
+
+put 'customer_profiles', 'CUST1003', 'info:mobile', '9876543212'
+
+put 'customer_profiles', 'CUST1003', 'info:plan', '4G Premium'
+
+put 'customer_profiles', 'CUST1003', 'info:status', 'Inactive'
+
+put 'customer_profiles', 'CUST1003', 'info:data_gb', '10'
+
+
+------------------------------------------------
+13. INSERT CUSTOMER 4
+------------------------------------------------
+
+put 'customer_profiles', 'CUST1004', 'info:name', 'Neha'
+
+put 'customer_profiles', 'CUST1004', 'info:city', 'Bangalore'
+
+put 'customer_profiles', 'CUST1004', 'info:mobile', '9876543213'
+
+put 'customer_profiles', 'CUST1004', 'info:plan', '5G Premium'
+
+put 'customer_profiles', 'CUST1004', 'info:status', 'Active'
+
+put 'customer_profiles', 'CUST1004', 'info:data_gb', '32'
+
+
+------------------------------------------------
+14. INSERT CUSTOMER 5
+------------------------------------------------
+
+put 'customer_profiles', 'CUST1005', 'info:name', 'Sneha'
+
+put 'customer_profiles', 'CUST1005', 'info:city', 'Chennai'
+
+put 'customer_profiles', 'CUST1005', 'info:mobile', '9876543214'
+
+put 'customer_profiles', 'CUST1005', 'info:plan', '4G Basic'
+
+put 'customer_profiles', 'CUST1005', 'info:status', 'Active'
+
+put 'customer_profiles', 'CUST1005', 'info:data_gb', '15'
+
+
+------------------------------------------------
+15. READ ONE CUSTOMER
+------------------------------------------------
+
+Get the complete profile of CUST1001:
+
+get 'customer_profiles', 'CUST1001'
+
+
+------------------------------------------------
+16. READ SPECIFIC COLUMN
+------------------------------------------------
+
+Get customer name:
+
+get 'customer_profiles', 'CUST1001', 'info:name'
+
+Get customer plan:
+
+get 'customer_profiles', 'CUST1001', 'info:plan'
+
+Get customer data usage:
+
+get 'customer_profiles', 'CUST1001', 'info:data_gb'
+
+
+------------------------------------------------
+17. READ MULTIPLE CUSTOMERS
+------------------------------------------------
+
+scan 'customer_profiles'
+
+
+------------------------------------------------
+18. UPDATE CUSTOMER DATA
+------------------------------------------------
+
+Update Rahul's plan:
+
+put 'customer_profiles', 'CUST1001', 'info:plan', '5G Ultra'
+
+Verify:
+
+get 'customer_profiles', 'CUST1001', 'info:plan'
+
+
+------------------------------------------------
+19. UPDATE DATA USAGE
+------------------------------------------------
+
+Update Rahul's data usage:
+
+put 'customer_profiles', 'CUST1001', 'info:data_gb', '40'
+
+Verify:
+
+get 'customer_profiles', 'CUST1001', 'info:data_gb'
+
+
+------------------------------------------------
+20. DELETE A COLUMN
+------------------------------------------------
+
+Delete Rahul's mobile number:
+
+delete 'customer_profiles', 'CUST1001', 'info:mobile'
+
+Verify:
+
+get 'customer_profiles', 'CUST1001'
+
+
+------------------------------------------------
+21. COUNT CUSTOMERS
+------------------------------------------------
+
+count 'customer_profiles'
+
+
+------------------------------------------------
+22. DELETE ONE CUSTOMER
+------------------------------------------------
+
+Delete customer CUST1005:
+
+deleteall 'customer_profiles', 'CUST1005
+
+Verify:
+
+get 'customer_profiles', 'CUST1005'
+
+
+------------------------------------------------
+23. COUNT AGAIN
+------------------------------------------------
+
+count 'customer_profiles'
+
+
+------------------------------------------------
+24. SCAN AFTER DELETE
+------------------------------------------------
+
+scan 'customer_profiles'
+
+
+------------------------------------------------
+25. DESCRIBE TABLE METADATA
+------------------------------------------------
+
+describe 'customer_profiles'
+
+
+------------------------------------------------
+26. DISABLE TABLE
+------------------------------------------------
+
+disable 'customer_profiles'
+
+Check:
+
+is_disabled 'customer_profiles'
+
+
+------------------------------------------------
+27. DROP TABLE
+------------------------------------------------
+
+drop 'customer_profiles'
+
+
+------------------------------------------------
+28. CHECK TABLE
+------------------------------------------------
+
+list
+
+
+------------------------------------------------
+29. COMPLETE DATA FLOW
+------------------------------------------------
+
+Telecom Customer
+       |
+       v
+Customer ID
+       |
+       v
+     HBase
+       |
+       v
+customer_profiles
+       |
+       +---- personal
+       |
+       +---- subscription
+       |
+       +---- usage
+       |
+       v
+Fast Customer Lookup
+
+
+------------------------------------------------
+30. HBASE COMMANDS USED
+------------------------------------------------
+
+create
+    -> Create table
+
+put
+    -> Insert / update data
+
+get
+    -> Read one row
+
+scan
+    -> Read multiple rows
+
+delete
+    -> Delete a column
+
+deleteall
+    -> Delete a row
+
+count
+    -> Count rows
+
+describe
+    -> Display table metadata
+
+disable
+    -> Disable table
+
+drop
+    -> Remove table
+
+
+------------------------------------------------
+31. FINAL DATA MODEL
+------------------------------------------------
+
+Table: customer_profiles
+
+RowKey       personal             subscription          usage
+
+CUST1001     name=Rahul           plan=5G Ultra         data_gb=40
+             city=Mumbai          status=Active
+
+CUST1002     name=Priya           plan=5G Basic         data_gb=18
+             city=Pune            status=Active
+
+CUST1003     name=Amit            plan=4G Premium       data_gb=10
+             city=Delhi            status=Inactive
+
+CUST1004     name=Neha            plan=5G Premium       data_gb=32
+             city=Bangalore       status=Active
+
+
+------------------------------------------------
+32. INTERVIEW EXPLANATION
+------------------------------------------------
+
+"I implemented a Customer 360 use case using HBase for a telecom company.
+
+I created a customer_profiles table with Customer ID as the RowKey and stored personal, subscription, and usage information in separate column families.
+
+I used put to insert and update customer information, get for fast individual customer lookup, scan for retrieving multiple customers, and delete and deleteall for removing data.
+
+I also used count, describe, disable, and drop to manage the HBase table."
+
+
+------------------------------------------------
+33. PROJECT STATUS
+------------------------------------------------
+
+COMPLETED SUCCESSFULLY
